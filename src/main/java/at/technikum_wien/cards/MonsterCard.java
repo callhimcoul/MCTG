@@ -1,9 +1,8 @@
 package at.technikum_wien.cards;
 
 public class MonsterCard extends Card {
-    private String elementType; // 'fire', 'water', 'normal'
+    private String elementType; // fire, water und normal
 
-    // Leerer Konstruktor für die JSON-Deserialisierung
     public MonsterCard() {
         super();
     }

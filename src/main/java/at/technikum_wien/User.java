@@ -10,8 +10,6 @@ public class User {
         this.coins = coins;
         this.elo = elo;
     }
-
-    // Getter-Methoden
     public String getUsername() {
         return username;
     }
@@ -24,7 +22,6 @@ public class User {
         return elo;
     }
 
-    // Optional: Setter-Methoden, falls erforderlich
     public void setCoins(int coins) {
         this.coins = coins;
     }

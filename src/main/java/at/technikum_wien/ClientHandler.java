@@ -60,7 +60,6 @@ public class ClientHandler implements Runnable {
                     String path = requestParts[1];
                     String httpVersion = requestParts[2];
 
-                    // Routing Logik
                     if (method.equals("GET") && path.equals("/")) {
                         sendResponse(writer, "Hello, World!", 200);
                     } else if (method.equals("POST") && path.equals("/users")) {
@@ -78,7 +77,7 @@ public class ClientHandler implements Runnable {
                     } else if (method.equals("PUT") && path.equals("/deck")) {
                         handleSetDeck(body, headers.get("Authorization"), writer, objectMapper);
                     }
-                    // Neue Benutzerverwaltungs-Endpunkte
+
                     else if (method.equals("GET") && path.matches("/users/[^/]+")) {
                         String username = path.substring("/users/".length());
                         handleGetUser(username, writer, objectMapper, headers);
@@ -86,23 +85,17 @@ public class ClientHandler implements Runnable {
                         String username = path.substring("/users/".length());
                         handleUpdateUser(username, body, headers.get("Authorization"), writer, objectMapper);
                     }
-                    // Weitere Endpunkte können hier hinzugefügt werden
                     else {
                         sendResponse(writer, "Not Found", 404);
                     }
                 }
             }
-
             clientSocket.close();
-
         } catch (IOException e) {
             e.printStackTrace();
         }
     }
 
-    /**
-     * Behandelt die Benutzerregistrierung (POST /users).
-     */
     private void handleUserRegistration(String body, BufferedWriter writer, ObjectMapper objectMapper) throws IOException {
         try {
             Map<String, String> userData = objectMapper.readValue(body, new TypeReference<Map<String, String>>() {});
@@ -113,7 +106,6 @@ public class ClientHandler implements Runnable {
                 sendResponse(writer, "Bad Request", 400);
                 return;
             }
-
             boolean userCreated = UserDatabase.createUser(username, password);
             if (userCreated) {
                 sendResponse(writer, "Created", 201);
@@ -125,9 +117,6 @@ public class ClientHandler implements Runnable {
         }
     }
 
-    /**
-     * Behandelt die Benutzeranmeldung (POST /sessions).
-     */
     private void handleUserLogin(String body, BufferedWriter writer, ObjectMapper objectMapper) throws IOException {
         try {
             Map<String, String> credentials = objectMapper.readValue(body, new TypeReference<Map<String, String>>() {});
@@ -140,8 +129,7 @@ public class ClientHandler implements Runnable {
             }
 
             if (UserDatabase.authenticateUser(username, password)) {
-                String token = username + "-mtcgToken";
-                // Token in der Datenbank speichern
+                String token = username + "-mctgToken";
                 boolean tokenUpdated = UserDatabase.updateToken(username, token);
                 if (tokenUpdated) {
                     Map<String, String> response = new HashMap<>();
@@ -159,9 +147,6 @@ public class ClientHandler implements Runnable {
         }
     }
 
-    /**
-     * Behandelt die Paket-Erstellung (POST /packages).
-     */
     private void handlePackageCreation(String body, String authHeader, BufferedWriter writer, ObjectMapper objectMapper) throws IOException {
         String token = getTokenFromHeader(authHeader);
         if (token == null || !isAdmin(token)) {
@@ -182,9 +167,6 @@ public class ClientHandler implements Runnable {
         }
     }
 
-    /**
-     * Behandelt den Paket-Kauf (POST /transactions/packages).
-     */
     private void handlePackagePurchase(String authHeader, BufferedWriter writer, ObjectMapper objectMapper) throws IOException {
         String token = getTokenFromHeader(authHeader);
         String username = UserDatabase.getUsernameByToken(token);
@@ -201,9 +183,6 @@ public class ClientHandler implements Runnable {
         }
     }
 
-    /**
-     * Behandelt das Abrufen der Benutzerkarten (GET /cards).
-     */
     private void handleGetUserCards(String authHeader, BufferedWriter writer, ObjectMapper objectMapper) throws IOException {
         String token = getTokenFromHeader(authHeader);
         String username = UserDatabase.getUsernameByToken(token);
@@ -221,9 +200,6 @@ public class ClientHandler implements Runnable {
         }
     }
 
-    /**
-     * Behandelt das Abrufen des Benutzerdecks (GET /deck).
-     */
     private void handleGetDeck(String authHeader, BufferedWriter writer, ObjectMapper objectMapper) throws IOException {
         String token = getTokenFromHeader(authHeader);
         String username = UserDatabase.getUsernameByToken(token);
@@ -241,9 +217,7 @@ public class ClientHandler implements Runnable {
         }
     }
 
-    /**
-     * Behandelt das Setzen des Benutzerdecks (PUT /deck).
-     */
+
     private void handleSetDeck(String body, String authHeader, BufferedWriter writer, ObjectMapper objectMapper) throws IOException {
         String token = getTokenFromHeader(authHeader);
         String username = UserDatabase.getUsernameByToken(token);
@@ -266,9 +240,6 @@ public class ClientHandler implements Runnable {
         }
     }
 
-    /**
-     * Behandelt das Abrufen von Benutzerdaten (GET /users/{username}).
-     */
     private void handleGetUser(String username, BufferedWriter writer, ObjectMapper objectMapper, Map<String, String> headers) throws IOException {
         String authHeader = headers.get("Authorization");
         String token = getTokenFromHeader(authHeader);
@@ -288,9 +259,7 @@ public class ClientHandler implements Runnable {
         }
     }
 
-    /**
-     * Behandelt das Aktualisieren von Benutzerdaten (PUT /users/{username}).
-     */
+
     private void handleUpdateUser(String username, String body, String authHeader, BufferedWriter writer, ObjectMapper objectMapper) throws IOException {
         String token = getTokenFromHeader(authHeader);
         String requester = UserDatabase.getUsernameByToken(token);
@@ -307,25 +276,16 @@ public class ClientHandler implements Runnable {
                 sendResponse(writer, "Bad Request", 400);
                 return;
             }
-
             boolean updated = UserDatabase.updateUserPassword(username, newPassword);
             if (updated) {
                 sendResponse(writer, "OK", 200);
             } else {
                 sendResponse(writer, "Not Found", 404);
             }
-
         } catch (JsonProcessingException e) {
             sendResponse(writer, "Bad Request", 400);
         }
     }
-
-    /**
-     * Extrahiert das Token aus dem Authorization-Header.
-     *
-     * @param authHeader Der Wert des Authorization-Headers
-     * @return Das extrahierte Token oder null, wenn kein Token vorhanden ist
-     */
     private String getTokenFromHeader(String authHeader) {
         if (authHeader != null && authHeader.startsWith("Bearer ")) {
             return authHeader.substring(7).trim();
@@ -333,25 +293,10 @@ public class ClientHandler implements Runnable {
         return null;
     }
 
-    /**
-     * Überprüft, ob das Token einem Admin entspricht.
-     *
-     * @param token Das Authentifizierungstoken
-     * @return true, wenn das Token einem Admin gehört, sonst false
-     */
     private boolean isAdmin(String token) {
-        // Beispielhafte Implementierung: Ein Admin-Token ist "admin-mtcgToken"
-        return "admin-mtcgToken".equals(token);
+        return "admin-mctgToken".equals(token);
     }
 
-    /**
-     * Sendet eine einfache Textantwort.
-     *
-     * @param writer     BufferedWriter zum Senden der Antwort
-     * @param body       Der Antworttext
-     * @param statusCode Der HTTP-Statuscode
-     * @throws IOException Wenn ein Fehler beim Schreiben auftritt
-     */
     private void sendResponse(BufferedWriter writer, String body, int statusCode) throws IOException {
         String response = "HTTP/1.1 " + statusCode + " " + getReasonPhrase(statusCode) + "\r\n" +
                 "Content-Type: text/plain\r\n" +
@@ -362,14 +307,6 @@ public class ClientHandler implements Runnable {
         writer.flush();
     }
 
-    /**
-     * Sendet eine JSON-Antwort.
-     *
-     * @param writer     BufferedWriter zum Senden der Antwort
-     * @param jsonBody   Der JSON-formattierte Antworttext
-     * @param statusCode Der HTTP-Statuscode
-     * @throws IOException Wenn ein Fehler beim Schreiben auftritt
-     */
     private void sendJsonResponse(BufferedWriter writer, String jsonBody, int statusCode) throws IOException {
         String response = "HTTP/1.1 " + statusCode + " " + getReasonPhrase(statusCode) + "\r\n" +
                 "Content-Type: application/json\r\n" +
@@ -380,12 +317,6 @@ public class ClientHandler implements Runnable {
         writer.flush();
     }
 
-    /**
-     * Gibt die Begründung für den HTTP-Statuscode zurück.
-     *
-     * @param statusCode Der HTTP-Statuscode
-     * @return Die Begründung als String
-     */
     private String getReasonPhrase(int statusCode) {
         return switch (statusCode) {
             case 200 -> "OK";

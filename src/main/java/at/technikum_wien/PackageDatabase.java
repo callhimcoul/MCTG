@@ -3,8 +3,6 @@ package at.technikum_wien;
 import at.technikum_wien.cards.Card;
 import at.technikum_wien.cards.MonsterCard;
 import at.technikum_wien.cards.SpellCard;
-import at.technikum_wien.Database;
-
 
 import java.sql.Connection;
 import java.sql.PreparedStatement;
@@ -13,7 +11,6 @@ import java.sql.SQLException;
 import java.util.List;
 
 
-import java.sql.*;
 import java.util.UUID;
 
 public class PackageDatabase {
@@ -28,20 +25,17 @@ public class PackageDatabase {
         String insertPackageCard = "INSERT INTO package_cards (package_id, card_id) VALUES (?, ?)";
 
         try (Connection conn = Database.getConnection()) {
-            conn.setAutoCommit(false); // Beginne Transaktion
+            conn.setAutoCommit(false);
 
             try (PreparedStatement packageStmt = conn.prepareStatement(insertPackage);
                  PreparedStatement cardStmt = conn.prepareStatement(insertCard);
                  PreparedStatement packageCardStmt = conn.prepareStatement(insertPackageCard)) {
 
-                // Paket erstellen
                 ResultSet rs = packageStmt.executeQuery();
                 if (rs.next()) {
                     int packageId = rs.getInt(1);
 
-                    // Karten hinzufügen
                     for (Card card : cards) {
-                        // Karte einfügen
                         cardStmt.setObject(1, UUID.fromString(card.getId()));
                         cardStmt.setString(2, card.getName());
                         cardStmt.setDouble(3, card.getDamage());
@@ -55,13 +49,11 @@ public class PackageDatabase {
                         cardStmt.setString(5, elementType);
                         cardStmt.executeUpdate();
 
-                        // Beziehung zwischen Paket und Karte erstellen
                         packageCardStmt.setInt(1, packageId);
                         packageCardStmt.setObject(2, UUID.fromString(card.getId()));
                         packageCardStmt.executeUpdate();
                     }
-
-                    conn.commit(); // Transaktion abschließen
+                    conn.commit();
                     return true;
                 } else {
                     conn.rollback();
@@ -96,7 +88,6 @@ public class PackageDatabase {
                  PreparedStatement coinsStmt = conn.prepareStatement(getCoins);
                  PreparedStatement updateCoinsStmt = conn.prepareStatement(updateCoins)) {
 
-                // Überprüfen, ob der Benutzer genug Coins hat
                 coinsStmt.setString(1, username);
                 ResultSet coinsRs = coinsStmt.executeQuery();
                 if (coinsRs.next()) {
@@ -109,19 +100,15 @@ public class PackageDatabase {
                     conn.rollback();
                     return false;
                 }
-
-                // Paket auswählen
                 ResultSet packageRs = packageStmt.executeQuery();
                 if (packageRs.next()) {
                     int packageId = packageRs.getInt("id");
 
-                    // Karten des Pakets abrufen
                     String getCards = "SELECT card_id FROM package_cards WHERE package_id = ?";
                     try (PreparedStatement cardsStmt = conn.prepareStatement(getCards)) {
                         cardsStmt.setInt(1, packageId);
                         ResultSet cardsRs = cardsStmt.executeQuery();
 
-                        // Karten dem Benutzer hinzufügen
                         while (cardsRs.next()) {
                             UUID cardId = (UUID) cardsRs.getObject("card_id");
                             userCardStmt.setString(1, username);
@@ -130,19 +117,16 @@ public class PackageDatabase {
                         }
                     }
 
-                    // Paket als erworben markieren
                     acquiredPackageStmt.setString(1, username);
                     acquiredPackageStmt.setInt(2, packageId);
                     acquiredPackageStmt.executeUpdate();
 
-                    // Coins abziehen
                     updateCoinsStmt.setString(1, username);
                     updateCoinsStmt.executeUpdate();
 
                     conn.commit();
                     return true;
                 } else {
-                    // Keine Pakete verfügbar
                     conn.rollback();
                     return false;
                 }

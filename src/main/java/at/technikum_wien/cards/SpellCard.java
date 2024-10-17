@@ -3,7 +3,6 @@ package at.technikum_wien.cards;
 public class SpellCard extends Card {
     private String elementType; // 'fire', 'water', 'normal'
 
-    // Leerer Konstruktor für die JSON-Deserialisierung
     public SpellCard() {
         super();
     }
