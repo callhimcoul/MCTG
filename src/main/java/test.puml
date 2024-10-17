@@ -1,0 +1,85 @@
+@startuml
+class Main {
+    +main(String[] args)
+}
+
+class ClientHandler {
+    -Socket clientSocket
+    +run()
+    +handleUserRegistration(body, writer, objectMapper)
+    +handleUserLogin(body, writer, objectMapper)
+    +handlePackageCreation(body, authHeader, writer, objectMapper)
+    +handlePackagePurchase(authHeader, writer, objectMapper)
+    +handleGetUserCards(authHeader, writer, objectMapper)
+    +handleGetDeck(authHeader, writer, objectMapper)
+    +handleSetDeck(body, authHeader, writer, objectMapper)
+    +handleGetUser(username, writer, objectMapper, headers)
+    +handleUpdateUser(username, body, authHeader, writer, objectMapper)
+}
+
+class Database {
+    +getConnection(): Connection
+    +getCurrentDatabase(Connection): String
+}
+
+class UserDatabase {
+    +createUser(String, String): boolean
+    +authenticateUser(String, String): boolean
+    +getUserCards(String): List<Card>
+    +getUserDeck(String): List<Card>
+    +setUserDeck(String, List<String>): boolean
+    +updateToken(String, String): boolean
+    +getUsernameByToken(String): String
+    +getUser(String): User
+    +updateUserPassword(String, String): boolean
+    +transferCard(String, String, String): boolean
+}
+
+class PackageDatabase {
+    +createPackage(List<Card>): boolean
+    +purchasePackage(String): boolean
+}
+
+class User {
+    -String username
+    -int coins
+    -int elo
+    +getUsername(): String
+    +getCoins(): int
+    +getElo(): int
+    +setCoins(int)
+    +setElo(int)
+}
+
+abstract class Card {
+    -String id
+    -String name
+    -double damage
+    +getId(): String
+    +getName(): String
+    +getDamage(): double
+    +getType(): String
+}
+
+class MonsterCard {
+    -String elementType
+    +getElementType(): String
+    +getType(): String
+}
+
+class SpellCard {
+    -String elementType
+    +getElementType(): String
+    +getType(): String
+}
+
+Main --> ClientHandler
+ClientHandler --> UserDatabase
+ClientHandler --> PackageDatabase
+ClientHandler --> Database
+UserDatabase --> User
+UserDatabase --> Card
+PackageDatabase --> Card
+Card <|-- MonsterCard
+Card <|-- SpellCard
+@enduml
