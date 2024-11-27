@@ -23,4 +23,4 @@ public class Main {
             e.printStackTrace();
         }
     }
-}
+} Пример для проверки
