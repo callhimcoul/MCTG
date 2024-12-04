@@ -15,7 +15,7 @@ class ClientHandler {
     +handleSetDeck(body, authHeader, writer, objectMapper)
     +handleGetUser(username, writer, objectMapper, headers)
     +handleUpdateUser(username, body, authHeader, writer, objectMapper)
-}
+}.....
 
 class Database {
     +getConnection(): Connection
