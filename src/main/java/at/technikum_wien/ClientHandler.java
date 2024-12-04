@@ -87,6 +87,19 @@ public class ClientHandler implements Runnable {
                         handleUpdateUser(username, body, headers.get("Authorization"), writer, objectMapper);
                     }
                     // Weitere Endpunkte können hier hinzugefügt werden
+                    else if (method.equals("POST") && path.equals("/battles")) {
+                        handleBattleRequest(headers.get("Authorization"), writer, objectMapper);
+                    }
+
+                    else if (method.equals("GET") && path.equals("/scoreboard")) {
+                        handleGetScoreboard(headers.get("Authorization"), writer, objectMapper);
+                    }
+
+                    else if (method.equals("GET") && path.equals("/stats")) {
+                        handleGetUserStats(headers.get("Authorization"), writer, objectMapper);
+                    }
+
+
                     else {
                         sendResponse(writer, "Not Found", 404);
                     }
@@ -301,16 +314,12 @@ public class ClientHandler implements Runnable {
 
         try {
             Map<String, String> userData = objectMapper.readValue(body, new TypeReference<Map<String, String>>() {});
-            String newPassword = userData.get("Password"); // Beispiel: Nur Passwort aktualisieren
+            String newBio = userData.get("Bio");
+            String newImage = userData.get("Image");
 
-            if (newPassword == null || newPassword.isEmpty()) {
-                sendResponse(writer, "Bad Request", 400);
-                return;
-            }
-
-            boolean updated = UserDatabase.updateUserPassword(username, newPassword);
+            boolean updated = UserDatabase.updateUserProfile(username, newBio, newImage);
             if (updated) {
-                sendResponse(writer, "OK", 200);
+                sendResponse(writer, "Profile updated successfully", 200);
             } else {
                 sendResponse(writer, "Not Found", 404);
             }
@@ -319,6 +328,58 @@ public class ClientHandler implements Runnable {
             sendResponse(writer, "Bad Request", 400);
         }
     }
+
+
+    private void handleBattleRequest(String authHeader, BufferedWriter writer, ObjectMapper objectMapper) throws IOException {
+        String token = getTokenFromHeader(authHeader);
+        String username = UserDatabase.getUsernameByToken(token);
+        if (username == null) {
+            sendResponse(writer, "Unauthorized", 401);
+            return;
+        }
+
+        List<Card> deck = UserDatabase.getUserDeck(username);
+        if (deck == null || deck.size() != 4) {
+            sendResponse(writer, "Deck not configured properly. Ensure you have exactly 4 cards in your deck.", 400);
+            return;
+        }
+
+        // Add player to the matchmaking queue
+        BattleHandler.enqueuePlayer(new Player(username, deck, writer));
+    }
+
+    private void handleGetScoreboard(String authHeader, BufferedWriter writer, ObjectMapper objectMapper) throws IOException {
+        String token = getTokenFromHeader(authHeader);
+        String username = UserDatabase.getUsernameByToken(token);
+        if (username == null) {
+            sendResponse(writer, "Unauthorized", 401);
+            return;
+        }
+
+        List<User> users = UserDatabase.getAllUsersSortedByElo();
+        String jsonResponse = objectMapper.writeValueAsString(users);
+        sendJsonResponse(writer, jsonResponse, 200);
+    }
+
+    private void handleGetUserStats(String authHeader, BufferedWriter writer, ObjectMapper objectMapper) throws IOException {
+        String token = getTokenFromHeader(authHeader);
+        String username = UserDatabase.getUsernameByToken(token);
+        if (username == null) {
+            sendResponse(writer, "Unauthorized", 401);
+            return;
+        }
+
+        User user = UserDatabase.getUser(username);
+        if (user != null) {
+            String jsonResponse = objectMapper.writeValueAsString(user);
+            sendJsonResponse(writer, jsonResponse, 200);
+        } else {
+            sendResponse(writer, "User not found", 404);
+        }
+    }
+
+
+
 
     /**
      * Extrahiert das Token aus dem Authorization-Header.

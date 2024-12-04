@@ -357,7 +357,7 @@ public class UserDatabase {
      * @return true, wenn die ELO erfolgreich aktualisiert wurde, sonst false
      */
     public static boolean updateUserElo(String username, int eloChange) {
-        String updateElo = "UPDATE users SET elo = elo + ? WHERE username = ?";
+        String updateElo = "UPDATE users SET elo = GREATEST(0, elo + ?) WHERE username = ?";
         try (Connection conn = Database.getConnection();
              PreparedStatement stmt = conn.prepareStatement(updateElo)) {
 
@@ -371,6 +371,7 @@ public class UserDatabase {
             return false;
         }
     }
+
 
     /**
      * Transferiert eine Karte von einem Benutzer zu einem anderen.
@@ -429,7 +430,7 @@ public class UserDatabase {
      * @return User Objekt oder null bei Fehler
      */
     public static User getUser(String username) {
-        String query = "SELECT username, coins, elo FROM users WHERE username = ?";
+        String query = "SELECT username, coins, elo, bio, image FROM users WHERE username = ?";
         try (Connection conn = Database.getConnection();
              PreparedStatement stmt = conn.prepareStatement(query)) {
 
@@ -439,7 +440,9 @@ public class UserDatabase {
                 String uname = rs.getString("username");
                 int coins = rs.getInt("coins");
                 int elo = rs.getInt("elo");
-                return new User(uname, coins, elo);
+                String bio = rs.getString("bio");
+                String image = rs.getString("image");
+                return new User(uname, coins, elo, bio, image);
             } else {
                 return null;
             }
@@ -449,6 +452,24 @@ public class UserDatabase {
             return null;
         }
     }
+
+    public static boolean updateUserProfile(String username, String bio, String image) {
+        String updateProfile = "UPDATE users SET bio = ?, image = ? WHERE username = ?";
+        try (Connection conn = Database.getConnection();
+             PreparedStatement stmt = conn.prepareStatement(updateProfile)) {
+
+            stmt.setString(1, bio);
+            stmt.setString(2, image);
+            stmt.setString(3, username);
+            int rowsAffected = stmt.executeUpdate();
+            return rowsAffected == 1;
+
+        } catch (SQLException e) {
+            e.printStackTrace();
+            return false;
+        }
+    }
+
 
     /**
      * Aktualisiert die Benutzerdaten (z.B. Passwort) für die PUT /users/{username} Anfrage.
@@ -472,6 +493,57 @@ public class UserDatabase {
             return false;
         }
     }
+
+    public static void addCardToUser(String username, String cardId) {
+        String query = "INSERT INTO user_cards (username, card_id) VALUES (?, ?)";
+        try (Connection conn = Database.getConnection();
+             PreparedStatement stmt = conn.prepareStatement(query)) {
+
+            stmt.setString(1, username);
+            stmt.setObject(2, UUID.fromString(cardId));
+            stmt.executeUpdate();
+
+        } catch (SQLException e) {
+            e.printStackTrace();
+        }
+    }
+
+    public static void removeCardFromUser(String username, String cardId) {
+        String query = "DELETE FROM user_cards WHERE username = ? AND card_id = ?";
+        try (Connection conn = Database.getConnection();
+             PreparedStatement stmt = conn.prepareStatement(query)) {
+
+            stmt.setString(1, username);
+            stmt.setObject(2, UUID.fromString(cardId));
+            stmt.executeUpdate();
+
+        } catch (SQLException e) {
+            e.printStackTrace();
+        }
+    }
+
+    public static List<User> getAllUsersSortedByElo() {
+        String query = "SELECT username, coins, elo FROM users ORDER BY elo DESC";
+        List<User> users = new ArrayList<>();
+        try (Connection conn = Database.getConnection();
+             PreparedStatement stmt = conn.prepareStatement(query);
+             ResultSet rs = stmt.executeQuery()) {
+
+            while (rs.next()) {
+                String username = rs.getString("username");
+                int coins = rs.getInt("coins");
+                int elo = rs.getInt("elo");
+                users.add(new User(username, coins, elo));
+            }
+            return users;
+
+        } catch (SQLException e) {
+            e.printStackTrace();
+            return users;
+        }
+    }
+
+
 
     /**
      * Überprüft, ob eine Karte im Stack eines Benutzers ist (nicht im Deck).
