@@ -430,7 +430,7 @@ public class UserDatabase {
      * @return User Objekt oder null bei Fehler
      */
     public static User getUser(String username) {
-        String query = "SELECT username, coins, elo, bio, image FROM users WHERE username = ?";
+        String query = "SELECT username, coins, elo, bio, image, games_played FROM users WHERE username = ?";
         try (Connection conn = Database.getConnection();
              PreparedStatement stmt = conn.prepareStatement(query)) {
 
@@ -442,7 +442,8 @@ public class UserDatabase {
                 int elo = rs.getInt("elo");
                 String bio = rs.getString("bio");
                 String image = rs.getString("image");
-                return new User(uname, coins, elo, bio, image);
+                int gamesPlayed = rs.getInt("games_played");
+                return new User(uname, coins, elo, bio, image, gamesPlayed);
             } else {
                 return null;
             }
@@ -452,6 +453,7 @@ public class UserDatabase {
             return null;
         }
     }
+
 
     public static boolean updateUserProfile(String username, String bio, String image) {
         String updateProfile = "UPDATE users SET bio = ?, image = ? WHERE username = ?";
@@ -522,8 +524,82 @@ public class UserDatabase {
         }
     }
 
+
+
+
+    public static Card getCardById(String cardId) {
+        String query = "SELECT * FROM cards WHERE id = ?";
+        try (Connection conn = Database.getConnection();
+             PreparedStatement stmt = conn.prepareStatement(query)) {
+
+            stmt.setObject(1, UUID.fromString(cardId));
+            ResultSet rs = stmt.executeQuery();
+            if (rs.next()) {
+                String id = rs.getString("id");
+                String name = rs.getString("name");
+                double damage = rs.getDouble("damage");
+                String type = rs.getString("type");
+                String element = rs.getString("element");
+
+                if ("Monster".equalsIgnoreCase(type)) {
+                    return new MonsterCard(id, name, damage, element);
+                } else {
+                    return new SpellCard(id, name, damage, element);
+                }
+            } else {
+                return null;
+            }
+
+        } catch (SQLException e) {
+            e.printStackTrace();
+            return null;
+        }
+    }
+
+
+    public static boolean isCardOwnedByUser(String username, String cardId) {
+        String query = "SELECT COUNT(*) FROM user_cards WHERE username = ? AND card_id = ?";
+        try (Connection conn = Database.getConnection();
+             PreparedStatement stmt = conn.prepareStatement(query)) {
+
+            stmt.setString(1, username);
+            stmt.setObject(2, UUID.fromString(cardId));
+            ResultSet rs = stmt.executeQuery();
+            if (rs.next()) {
+                return rs.getInt(1) > 0;
+            } else {
+                return false;
+            }
+
+        } catch (SQLException e) {
+            e.printStackTrace();
+            return false;
+        }
+    }
+
+    public static boolean isCardInDeck(String username, String cardId) {
+        String query = "SELECT COUNT(*) FROM decks WHERE username = ? AND card_id = ?";
+        try (Connection conn = Database.getConnection();
+             PreparedStatement stmt = conn.prepareStatement(query)) {
+
+            stmt.setString(1, username);
+            stmt.setObject(2, UUID.fromString(cardId));
+            ResultSet rs = stmt.executeQuery();
+            if (rs.next()) {
+                return rs.getInt(1) > 0;
+            } else {
+                return false;
+            }
+
+        } catch (SQLException e) {
+            e.printStackTrace();
+            return false;
+        }
+    }
+
+
     public static List<User> getAllUsersSortedByElo() {
-        String query = "SELECT username, coins, elo FROM users ORDER BY elo DESC";
+        String query = "SELECT username, coins, elo, bio, image FROM users ORDER BY elo DESC";
         List<User> users = new ArrayList<>();
         try (Connection conn = Database.getConnection();
              PreparedStatement stmt = conn.prepareStatement(query);
@@ -533,13 +609,30 @@ public class UserDatabase {
                 String username = rs.getString("username");
                 int coins = rs.getInt("coins");
                 int elo = rs.getInt("elo");
-                users.add(new User(username, coins, elo));
+                String bio = rs.getString("bio");
+                String image = rs.getString("image");
+                users.add(new User(username, coins, elo, bio, image));
             }
             return users;
 
         } catch (SQLException e) {
             e.printStackTrace();
             return users;
+        }
+    }
+
+    public static boolean incrementGamesPlayed(String username) {
+        String updateGames = "UPDATE users SET games_played = games_played + 1 WHERE username = ?";
+        try (Connection conn = Database.getConnection();
+             PreparedStatement stmt = conn.prepareStatement(updateGames)) {
+
+            stmt.setString(1, username);
+            int rowsAffected = stmt.executeUpdate();
+            return rowsAffected == 1;
+
+        } catch (SQLException e) {
+            e.printStackTrace();
+            return false;
         }
     }
 

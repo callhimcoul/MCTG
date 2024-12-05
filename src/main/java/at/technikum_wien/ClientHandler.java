@@ -20,12 +20,16 @@ public class ClientHandler implements Runnable {
 
     @Override
     public void run() {
-        try (
-                InputStream input = clientSocket.getInputStream();
-                OutputStream output = clientSocket.getOutputStream();
-                BufferedReader reader = new BufferedReader(new InputStreamReader(input));
-                BufferedWriter writer = new BufferedWriter(new OutputStreamWriter(output))
-        ) {
+        InputStream input = null;
+        OutputStream output = null;
+        BufferedReader reader = null;
+        BufferedWriter writer = null;
+        try {
+            input = clientSocket.getInputStream();
+            output = clientSocket.getOutputStream();
+            reader = new BufferedReader(new InputStreamReader(input));
+            writer = new BufferedWriter(new OutputStreamWriter(output));
+
             String requestLine = reader.readLine();
             System.out.println("Request Line: " + requestLine);
 
@@ -50,6 +54,8 @@ public class ClientHandler implements Runnable {
             }
 
             ObjectMapper objectMapper = new ObjectMapper();
+
+            boolean keepConnectionOpen = false; // Flag, um zu bestimmen, ob die Verbindung offen bleiben soll
 
             if (requestLine != null && !requestLine.isEmpty()) {
                 String[] requestParts = requestLine.split(" ");
@@ -86,32 +92,43 @@ public class ClientHandler implements Runnable {
                         String username = path.substring("/users/".length());
                         handleUpdateUser(username, body, headers.get("Authorization"), writer, objectMapper);
                     }
-                    // Weitere Endpunkte können hier hinzugefügt werden
+                    // Battle Endpoint
                     else if (method.equals("POST") && path.equals("/battles")) {
+                        keepConnectionOpen = true; // Verbindung offen halten
                         handleBattleRequest(headers.get("Authorization"), writer, objectMapper);
-                    }
-
-                    else if (method.equals("GET") && path.equals("/scoreboard")) {
+                    } else if (method.equals("GET") && path.equals("/scoreboard")) {
                         handleGetScoreboard(headers.get("Authorization"), writer, objectMapper);
-                    }
-
-                    else if (method.equals("GET") && path.equals("/stats")) {
+                    } else if (method.equals("GET") && path.equals("/stats")) {
                         handleGetUserStats(headers.get("Authorization"), writer, objectMapper);
                     }
-
-
-                    else {
+                    // Trading Deals
+                    else if (method.equals("POST") && path.equals("/tradings")) {
+                        handleCreateTradingDeal(body, headers.get("Authorization"), writer, objectMapper);
+                    } else if (method.equals("GET") && path.equals("/tradings")) {
+                        handleGetTradingDeals(headers.get("Authorization"), writer, objectMapper);
+                    } else if (method.equals("POST") && path.matches("/tradings/[^/]+")) {
+                        String dealId = path.substring("/tradings/".length());
+                        handleAcceptTradingDeal(dealId, body, headers.get("Authorization"), writer, objectMapper);
+                    } else {
                         sendResponse(writer, "Not Found", 404);
                     }
                 }
             }
 
-            clientSocket.close();
+            if (!keepConnectionOpen) {
+                // Ressourcen schließen
+                if (reader != null) reader.close();
+                if (writer != null) writer.close();
+                if (clientSocket != null && !clientSocket.isClosed()) clientSocket.close();
+            }
+            // Wenn die Verbindung offen gehalten wird (z.B. bei Battles), werden die Ressourcen später geschlossen
 
         } catch (IOException e) {
             e.printStackTrace();
         }
     }
+
+
 
     /**
      * Behandelt die Benutzerregistrierung (POST /users).
@@ -330,36 +347,46 @@ public class ClientHandler implements Runnable {
     }
 
 
+    private final Object battleLock = new Object();
+
     private void handleBattleRequest(String authHeader, BufferedWriter writer, ObjectMapper objectMapper) throws IOException {
         String token = getTokenFromHeader(authHeader);
         String username = UserDatabase.getUsernameByToken(token);
         if (username == null) {
             sendResponse(writer, "Unauthorized", 401);
+            writer.close();
+            if (clientSocket != null && !clientSocket.isClosed()) clientSocket.close();
             return;
         }
 
         List<Card> deck = UserDatabase.getUserDeck(username);
         if (deck == null || deck.size() != 4) {
             sendResponse(writer, "Deck not configured properly. Ensure you have exactly 4 cards in your deck.", 400);
+            writer.close();
+            if (clientSocket != null && !clientSocket.isClosed()) clientSocket.close();
             return;
         }
 
-        // Add player to the matchmaking queue
-        BattleHandler.enqueuePlayer(new Player(username, deck, writer));
-    }
+        Player player = new Player(username, deck, writer, battleLock);
 
-    private void handleGetScoreboard(String authHeader, BufferedWriter writer, ObjectMapper objectMapper) throws IOException {
-        String token = getTokenFromHeader(authHeader);
-        String username = UserDatabase.getUsernameByToken(token);
-        if (username == null) {
-            sendResponse(writer, "Unauthorized", 401);
-            return;
+        // Spieler zur Warteschlange hinzufügen
+        BattleHandler.enqueuePlayer(player);
+
+        // Warten, bis das Battle abgeschlossen ist
+        synchronized (battleLock) {
+            try {
+                battleLock.wait(); // Thread wartet hier, bis er benachrichtigt wird
+            } catch (InterruptedException e) {
+                e.printStackTrace();
+            }
         }
 
-        List<User> users = UserDatabase.getAllUsersSortedByElo();
-        String jsonResponse = objectMapper.writeValueAsString(users);
-        sendJsonResponse(writer, jsonResponse, 200);
+        // Nach dem Battle
+        if (writer != null) writer.close();
+        if (clientSocket != null && !clientSocket.isClosed()) clientSocket.close();
     }
+
+
 
     private void handleGetUserStats(String authHeader, BufferedWriter writer, ObjectMapper objectMapper) throws IOException {
         String token = getTokenFromHeader(authHeader);
@@ -377,6 +404,96 @@ public class ClientHandler implements Runnable {
             sendResponse(writer, "User not found", 404);
         }
     }
+
+
+    private void handleCreateTradingDeal(String body, String authHeader, BufferedWriter writer, ObjectMapper objectMapper) throws IOException {
+        String token = getTokenFromHeader(authHeader);
+        String username = UserDatabase.getUsernameByToken(token);
+        if (username == null) {
+            sendResponse(writer, "Unauthorized", 401);
+            return;
+        }
+
+        try {
+            // Handelsangebot aus dem Body lesen
+            TradingDeal deal = objectMapper.readValue(body, TradingDeal.class);
+            deal.setOwner(username);
+
+            // Überprüfen, ob die Karte dem Benutzer gehört und nicht im Deck ist
+            if (!UserDatabase.isCardOwnedByUser(username, deal.getCardToTrade()) || UserDatabase.isCardInDeck(username, deal.getCardToTrade())) {
+                sendResponse(writer, "Forbidden: You don't own this card or it's in your deck.", 403);
+                return;
+            }
+
+            boolean created = TradingDatabase.createTradingDeal(deal);
+            if (created) {
+                sendResponse(writer, "Trading deal created successfully.", 201);
+            } else {
+                sendResponse(writer, "Conflict: Could not create trading deal.", 409);
+            }
+
+        } catch (JsonProcessingException e) {
+            sendResponse(writer, "Bad Request", 400);
+        }
+    }
+
+    private void handleGetTradingDeals(String authHeader, BufferedWriter writer, ObjectMapper objectMapper) throws IOException {
+        String token = getTokenFromHeader(authHeader);
+        String username = UserDatabase.getUsernameByToken(token);
+        if (username == null) {
+            sendResponse(writer, "Unauthorized", 401);
+            return;
+        }
+
+        List<TradingDeal> deals = TradingDatabase.getAllTradingDeals();
+        String jsonResponse = objectMapper.writeValueAsString(deals);
+        sendJsonResponse(writer, jsonResponse, 200);
+    }
+
+    private void handleAcceptTradingDeal(String dealId, String body, String authHeader, BufferedWriter writer, ObjectMapper objectMapper) throws IOException {
+        String token = getTokenFromHeader(authHeader);
+        String buyer = UserDatabase.getUsernameByToken(token);
+        if (buyer == null) {
+            sendResponse(writer, "Unauthorized", 401);
+            return;
+        }
+
+        try {
+            Map<String, String> requestData = objectMapper.readValue(body, new TypeReference<Map<String, String>>() {});
+            String offeredCardId = requestData.get("cardId");
+
+            // Überprüfen, ob die angebotene Karte dem Benutzer gehört und nicht im Deck ist
+            if (!UserDatabase.isCardOwnedByUser(buyer, offeredCardId) || UserDatabase.isCardInDeck(buyer, offeredCardId)) {
+                sendResponse(writer, "Forbidden: You don't own this card or it's in your deck.", 403);
+                return;
+            }
+
+            boolean success = TradingDatabase.acceptTradingDeal(dealId, buyer, offeredCardId);
+            if (success) {
+                sendResponse(writer, "Trading deal accepted successfully.", 200);
+            } else {
+                sendResponse(writer, "Not Found or Conflict: Could not accept trading deal.", 409);
+            }
+
+        } catch (JsonProcessingException e) {
+            sendResponse(writer, "Bad Request", 400);
+        }
+    }
+
+    private void handleGetScoreboard(String authHeader, BufferedWriter writer, ObjectMapper objectMapper) throws IOException {
+        String token = getTokenFromHeader(authHeader);
+        String username = UserDatabase.getUsernameByToken(token);
+        if (username == null) {
+            sendResponse(writer, "Unauthorized", 401);
+            return;
+        }
+
+        List<User> users = UserDatabase.getAllUsersSortedByElo();
+        String jsonResponse = objectMapper.writeValueAsString(users);
+        sendJsonResponse(writer, jsonResponse, 200);
+    }
+
+
 
 
 

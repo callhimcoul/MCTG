@@ -1,12 +1,10 @@
 package at.technikum_wien;
+
 import at.technikum_wien.cards.Card;
 import at.technikum_wien.cards.MonsterCard;
 import at.technikum_wien.cards.SpellCard;
 
 import java.io.IOException;
-import java.util.HashSet;
-import java.util.Random;
-import java.util.Set;
 
 public class Battle {
     private Player player1;
@@ -77,7 +75,7 @@ public class Battle {
     private double calculateDamage(Card attacker, Card defender) {
         double damage = attacker.getDamage();
 
-        // If at least one card is a SpellCard, consider element effectiveness
+        // Wenn mindestens eine Karte eine SpellCard ist, berücksichtige Element-Effektivität
         if (attacker instanceof SpellCard || defender instanceof SpellCard) {
             String attackerElement = getElementType(attacker);
             String defenderElement = getElementType(defender);
@@ -119,7 +117,7 @@ public class Battle {
         String name1 = card1.getName().toLowerCase();
         String name2 = card2.getName().toLowerCase();
 
-        // Goblins are too afraid of Dragons
+        // Goblins sind zu ängstlich, um gegen Drachen zu kämpfen
         if (name1.contains("goblin") && name2.contains("dragon")) {
             battleLog.append("Goblins are too afraid of Dragons to attack.\n");
             battleLog.append(player2.getUsername()).append(" wins the round!\n\n");
@@ -134,22 +132,22 @@ public class Battle {
             return true;
         }
 
-        // Wizzard can control Orks
+        // Wizzards können Orks kontrollieren
         if (name1.contains("wizzard") && name2.contains("ork")) {
-            battleLog.append("Wizzard can control Orks.\n");
+            battleLog.append("Wizzards can control Orks.\n");
             battleLog.append(player1.getUsername()).append(" wins the round!\n\n");
             player1.addCard(card2);
             player2.removeCard(card2);
             return true;
         } else if (name2.contains("wizzard") && name1.contains("ork")) {
-            battleLog.append("Wizzard can control Orks.\n");
+            battleLog.append("Wizzards can control Orks.\n");
             battleLog.append(player2.getUsername()).append(" wins the round!\n\n");
             player2.addCard(card1);
             player1.removeCard(card1);
             return true;
         }
 
-        // Knights drown when attacked by WaterSpells
+        // Knights ertrinken, wenn sie von WaterSpells angegriffen werden
         if (name1.contains("waterspell") && name2.contains("knight")) {
             battleLog.append("Knights drown when attacked by WaterSpells.\n");
             battleLog.append(player1.getUsername()).append(" wins the round!\n\n");
@@ -164,7 +162,7 @@ public class Battle {
             return true;
         }
 
-        // The Kraken is immune against spells
+        // Der Kraken ist immun gegen Zauber
         if (card1 instanceof SpellCard && name2.contains("kraken")) {
             battleLog.append("The Kraken is immune against spells.\n");
             battleLog.append(player2.getUsername()).append(" wins the round!\n\n");
@@ -179,7 +177,7 @@ public class Battle {
             return true;
         }
 
-        // FireElves can evade Dragons
+        // FireElves können Drachen ausweichen
         if (name1.contains("fireelf") && name2.contains("dragon")) {
             battleLog.append("FireElves can evade Dragons.\n");
             battleLog.append("It's a draw!\n\n");
@@ -198,5 +196,8 @@ public class Battle {
             UserDatabase.updateUserElo(winner, 3);
             UserDatabase.updateUserElo(loser, -5);
         }
+        // Anzahl der gespielten Spiele aktualisieren
+        UserDatabase.incrementGamesPlayed(winner);
+        UserDatabase.incrementGamesPlayed(loser);
     }
 }
