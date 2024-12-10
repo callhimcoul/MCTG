@@ -55,7 +55,7 @@ public class ClientHandler implements Runnable {
 
             ObjectMapper objectMapper = new ObjectMapper();
 
-            boolean keepConnectionOpen = false; // Flag, um zu bestimmen, ob die Verbindung offen bleiben soll
+            boolean keepConnectionOpen = false;
 
             if (requestLine != null && !requestLine.isEmpty()) {
                 String[] requestParts = requestLine.split(" ");
@@ -64,7 +64,6 @@ public class ClientHandler implements Runnable {
                 } else {
                     String method = requestParts[0];
                     String path = requestParts[1];
-                    String httpVersion = requestParts[2];
 
                     // Routing Logik
                     if (method.equals("GET") && path.equals("/")) {
@@ -83,26 +82,20 @@ public class ClientHandler implements Runnable {
                         handleGetDeck(headers.get("Authorization"), writer, objectMapper);
                     } else if (method.equals("PUT") && path.equals("/deck")) {
                         handleSetDeck(body, headers.get("Authorization"), writer, objectMapper);
-                    }
-                    // Neue Benutzerverwaltungs-Endpunkte
-                    else if (method.equals("GET") && path.matches("/users/[^/]+")) {
+                    } else if (method.equals("GET") && path.matches("/users/[^/]+")) {
                         String username = path.substring("/users/".length());
                         handleGetUser(username, writer, objectMapper, headers);
                     } else if (method.equals("PUT") && path.matches("/users/[^/]+")) {
                         String username = path.substring("/users/".length());
                         handleUpdateUser(username, body, headers.get("Authorization"), writer, objectMapper);
-                    }
-                    // Battle Endpoint
-                    else if (method.equals("POST") && path.equals("/battles")) {
-                        keepConnectionOpen = true; // Verbindung offen halten
+                    } else if (method.equals("POST") && path.equals("/battles")) {
+                        keepConnectionOpen = true;
                         handleBattleRequest(headers.get("Authorization"), writer, objectMapper);
                     } else if (method.equals("GET") && path.equals("/scoreboard")) {
                         handleGetScoreboard(headers.get("Authorization"), writer, objectMapper);
                     } else if (method.equals("GET") && path.equals("/stats")) {
                         handleGetUserStats(headers.get("Authorization"), writer, objectMapper);
-                    }
-                    // Trading Deals
-                    else if (method.equals("POST") && path.equals("/tradings")) {
+                    } else if (method.equals("POST") && path.equals("/tradings")) {
                         handleCreateTradingDeal(body, headers.get("Authorization"), writer, objectMapper);
                     } else if (method.equals("GET") && path.equals("/tradings")) {
                         handleGetTradingDeals(headers.get("Authorization"), writer, objectMapper);
@@ -116,23 +109,16 @@ public class ClientHandler implements Runnable {
             }
 
             if (!keepConnectionOpen) {
-                // Ressourcen schließen
                 if (reader != null) reader.close();
                 if (writer != null) writer.close();
                 if (clientSocket != null && !clientSocket.isClosed()) clientSocket.close();
             }
-            // Wenn die Verbindung offen gehalten wird (z.B. bei Battles), werden die Ressourcen später geschlossen
 
         } catch (IOException e) {
             e.printStackTrace();
         }
     }
 
-
-
-    /**
-     * Behandelt die Benutzerregistrierung (POST /users).
-     */
     private void handleUserRegistration(String body, BufferedWriter writer, ObjectMapper objectMapper) throws IOException {
         try {
             Map<String, String> userData = objectMapper.readValue(body, new TypeReference<Map<String, String>>() {});
@@ -155,9 +141,6 @@ public class ClientHandler implements Runnable {
         }
     }
 
-    /**
-     * Behandelt die Benutzeranmeldung (POST /sessions).
-     */
     private void handleUserLogin(String body, BufferedWriter writer, ObjectMapper objectMapper) throws IOException {
         try {
             Map<String, String> credentials = objectMapper.readValue(body, new TypeReference<Map<String, String>>() {});
@@ -171,7 +154,6 @@ public class ClientHandler implements Runnable {
 
             if (UserDatabase.authenticateUser(username, password)) {
                 String token = username + "-mtcgToken";
-                // Token in der Datenbank speichern
                 boolean tokenUpdated = UserDatabase.updateToken(username, token);
                 if (tokenUpdated) {
                     Map<String, String> response = new HashMap<>();
@@ -189,9 +171,6 @@ public class ClientHandler implements Runnable {
         }
     }
 
-    /**
-     * Behandelt die Paket-Erstellung (POST /packages).
-     */
     private void handlePackageCreation(String body, String authHeader, BufferedWriter writer, ObjectMapper objectMapper) throws IOException {
         String token = getTokenFromHeader(authHeader);
         if (token == null || !isAdmin(token)) {
@@ -212,9 +191,6 @@ public class ClientHandler implements Runnable {
         }
     }
 
-    /**
-     * Behandelt den Paket-Kauf (POST /transactions/packages).
-     */
     private void handlePackagePurchase(String authHeader, BufferedWriter writer, ObjectMapper objectMapper) throws IOException {
         String token = getTokenFromHeader(authHeader);
         String username = UserDatabase.getUsernameByToken(token);
@@ -231,9 +207,6 @@ public class ClientHandler implements Runnable {
         }
     }
 
-    /**
-     * Behandelt das Abrufen der Benutzerkarten (GET /cards).
-     */
     private void handleGetUserCards(String authHeader, BufferedWriter writer, ObjectMapper objectMapper) throws IOException {
         String token = getTokenFromHeader(authHeader);
         String username = UserDatabase.getUsernameByToken(token);
@@ -251,9 +224,6 @@ public class ClientHandler implements Runnable {
         }
     }
 
-    /**
-     * Behandelt das Abrufen des Benutzerdecks (GET /deck).
-     */
     private void handleGetDeck(String authHeader, BufferedWriter writer, ObjectMapper objectMapper) throws IOException {
         String token = getTokenFromHeader(authHeader);
         String username = UserDatabase.getUsernameByToken(token);
@@ -271,9 +241,6 @@ public class ClientHandler implements Runnable {
         }
     }
 
-    /**
-     * Behandelt das Setzen des Benutzerdecks (PUT /deck).
-     */
     private void handleSetDeck(String body, String authHeader, BufferedWriter writer, ObjectMapper objectMapper) throws IOException {
         String token = getTokenFromHeader(authHeader);
         String username = UserDatabase.getUsernameByToken(token);
@@ -296,9 +263,6 @@ public class ClientHandler implements Runnable {
         }
     }
 
-    /**
-     * Behandelt das Abrufen von Benutzerdaten (GET /users/{username}).
-     */
     private void handleGetUser(String username, BufferedWriter writer, ObjectMapper objectMapper, Map<String, String> headers) throws IOException {
         String authHeader = headers.get("Authorization");
         String token = getTokenFromHeader(authHeader);
@@ -318,9 +282,6 @@ public class ClientHandler implements Runnable {
         }
     }
 
-    /**
-     * Behandelt das Aktualisieren von Benutzerdaten (PUT /users/{username}).
-     */
     private void handleUpdateUser(String username, String body, String authHeader, BufferedWriter writer, ObjectMapper objectMapper) throws IOException {
         String token = getTokenFromHeader(authHeader);
         String requester = UserDatabase.getUsernameByToken(token);
@@ -331,8 +292,8 @@ public class ClientHandler implements Runnable {
 
         try {
             Map<String, String> userData = objectMapper.readValue(body, new TypeReference<Map<String, String>>() {});
-            String newBio = userData.get("Bio");
-            String newImage = userData.get("Image");
+            String newBio = userData.getOrDefault("Bio", "");
+            String newImage = userData.getOrDefault("Image", "");
 
             boolean updated = UserDatabase.updateUserProfile(username, newBio, newImage);
             if (updated) {
@@ -345,7 +306,6 @@ public class ClientHandler implements Runnable {
             sendResponse(writer, "Bad Request", 400);
         }
     }
-
 
     private final Object battleLock = new Object();
 
@@ -368,25 +328,19 @@ public class ClientHandler implements Runnable {
         }
 
         Player player = new Player(username, deck, writer, battleLock);
-
-        // Spieler zur Warteschlange hinzufügen
         BattleHandler.enqueuePlayer(player);
 
-        // Warten, bis das Battle abgeschlossen ist
         synchronized (battleLock) {
             try {
-                battleLock.wait(); // Thread wartet hier, bis er benachrichtigt wird
+                battleLock.wait();
             } catch (InterruptedException e) {
                 e.printStackTrace();
             }
         }
 
-        // Nach dem Battle
         if (writer != null) writer.close();
         if (clientSocket != null && !clientSocket.isClosed()) clientSocket.close();
     }
-
-
 
     private void handleGetUserStats(String authHeader, BufferedWriter writer, ObjectMapper objectMapper) throws IOException {
         String token = getTokenFromHeader(authHeader);
@@ -405,7 +359,6 @@ public class ClientHandler implements Runnable {
         }
     }
 
-
     private void handleCreateTradingDeal(String body, String authHeader, BufferedWriter writer, ObjectMapper objectMapper) throws IOException {
         String token = getTokenFromHeader(authHeader);
         String username = UserDatabase.getUsernameByToken(token);
@@ -415,11 +368,9 @@ public class ClientHandler implements Runnable {
         }
 
         try {
-            // Handelsangebot aus dem Body lesen
             TradingDeal deal = objectMapper.readValue(body, TradingDeal.class);
             deal.setOwner(username);
 
-            // Überprüfen, ob die Karte dem Benutzer gehört und nicht im Deck ist
             if (!UserDatabase.isCardOwnedByUser(username, deal.getCardToTrade()) || UserDatabase.isCardInDeck(username, deal.getCardToTrade())) {
                 sendResponse(writer, "Forbidden: You don't own this card or it's in your deck.", 403);
                 return;
@@ -462,7 +413,6 @@ public class ClientHandler implements Runnable {
             Map<String, String> requestData = objectMapper.readValue(body, new TypeReference<Map<String, String>>() {});
             String offeredCardId = requestData.get("cardId");
 
-            // Überprüfen, ob die angebotene Karte dem Benutzer gehört und nicht im Deck ist
             if (!UserDatabase.isCardOwnedByUser(buyer, offeredCardId) || UserDatabase.isCardInDeck(buyer, offeredCardId)) {
                 sendResponse(writer, "Forbidden: You don't own this card or it's in your deck.", 403);
                 return;
@@ -493,17 +443,6 @@ public class ClientHandler implements Runnable {
         sendJsonResponse(writer, jsonResponse, 200);
     }
 
-
-
-
-
-
-    /**
-     * Extrahiert das Token aus dem Authorization-Header.
-     *
-     * @param authHeader Der Wert des Authorization-Headers
-     * @return Das extrahierte Token oder null, wenn kein Token vorhanden ist
-     */
     private String getTokenFromHeader(String authHeader) {
         if (authHeader != null && authHeader.startsWith("Bearer ")) {
             return authHeader.substring(7).trim();
@@ -511,25 +450,10 @@ public class ClientHandler implements Runnable {
         return null;
     }
 
-    /**
-     * Überprüft, ob das Token einem Admin entspricht.
-     *
-     * @param token Das Authentifizierungstoken
-     * @return true, wenn das Token einem Admin gehört, sonst false
-     */
     private boolean isAdmin(String token) {
-        // Beispielhafte Implementierung: Ein Admin-Token ist "admin-mtcgToken"
         return "admin-mtcgToken".equals(token);
     }
 
-    /**
-     * Sendet eine einfache Textantwort.
-     *
-     * @param writer     BufferedWriter zum Senden der Antwort
-     * @param body       Der Antworttext
-     * @param statusCode Der HTTP-Statuscode
-     * @throws IOException Wenn ein Fehler beim Schreiben auftritt
-     */
     private void sendResponse(BufferedWriter writer, String body, int statusCode) throws IOException {
         String response = "HTTP/1.1 " + statusCode + " " + getReasonPhrase(statusCode) + "\r\n" +
                 "Content-Type: text/plain\r\n" +
@@ -540,14 +464,6 @@ public class ClientHandler implements Runnable {
         writer.flush();
     }
 
-    /**
-     * Sendet eine JSON-Antwort.
-     *
-     * @param writer     BufferedWriter zum Senden der Antwort
-     * @param jsonBody   Der JSON-formattierte Antworttext
-     * @param statusCode Der HTTP-Statuscode
-     * @throws IOException Wenn ein Fehler beim Schreiben auftritt
-     */
     private void sendJsonResponse(BufferedWriter writer, String jsonBody, int statusCode) throws IOException {
         String response = "HTTP/1.1 " + statusCode + " " + getReasonPhrase(statusCode) + "\r\n" +
                 "Content-Type: application/json\r\n" +
@@ -558,12 +474,6 @@ public class ClientHandler implements Runnable {
         writer.flush();
     }
 
-    /**
-     * Gibt die Begründung für den HTTP-Statuscode zurück.
-     *
-     * @param statusCode Der HTTP-Statuscode
-     * @return Die Begründung als String
-     */
     private String getReasonPhrase(int statusCode) {
         return switch (statusCode) {
             case 200 -> "OK";
