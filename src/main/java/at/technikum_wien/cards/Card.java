@@ -12,11 +12,10 @@ import com.fasterxml.jackson.annotation.JsonTypeInfo;
         @JsonSubTypes.Type(value = SpellCard.class, name = "Spell")
 })
 public abstract class Card {
-    private String id; // Eindeutige Kennung (UUID)
+    private String id;
     private String name;
     private double damage;
 
-    // Leerer Konstruktor für die JSON-Deserialisierung
     public Card() {}
 
     public Card(String id, String name, double damage) {
@@ -25,19 +24,9 @@ public abstract class Card {
         this.damage = damage;
     }
 
-    // Getter-Methoden
-    public String getId() {
-        return id;
-    }
+    public String getId() { return id; }
+    public String getName() { return name; }
+    public double getDamage() { return damage; }
 
-    public String getName() {
-        return name;
-    }
-
-    public double getDamage() {
-        return damage;
-    }
-
-    // Abstrakte Methode, die von den Unterklassen implementiert wird
     public abstract String getType();
 }

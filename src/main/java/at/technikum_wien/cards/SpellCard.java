@@ -1,12 +1,9 @@
 package at.technikum_wien.cards;
 
 public class SpellCard extends Card {
-    private String elementType; // 'fire', 'water', 'normal'
+    private String elementType;
 
-    // Leerer Konstruktor für die JSON-Deserialisierung
-    public SpellCard() {
-        super();
-    }
+    public SpellCard() { super(); }
 
     public SpellCard(String id, String name, double damage, String elementType) {
         super(id, name, damage);

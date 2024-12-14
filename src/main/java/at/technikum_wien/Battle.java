@@ -30,13 +30,10 @@ public class Battle {
             battleLog.append(player1.getUsername()).append(" plays ").append(card1.getName()).append(" (Damage: ").append(card1.getDamage()).append(")\n");
             battleLog.append(player2.getUsername()).append(" plays ").append(card2.getName()).append(" (Damage: ").append(card2.getDamage()).append(")\n");
 
-            // Calculate damage with element effectiveness
-            double damage1 = calculateDamage(card1, card2);
-            double damage2 = calculateDamage(card2, card1);
+            double damage1 = calculateDamage(card1, card2, player1);
+            double damage2 = calculateDamage(card2, card1, player2);
 
-            // Apply special rules
             boolean specialRuleApplied = applySpecialRules(card1, card2);
-
             if (!specialRuleApplied) {
                 if (damage1 > damage2) {
                     battleLog.append(player1.getUsername()).append(" wins the round!\n\n");
@@ -67,15 +64,28 @@ public class Battle {
 
         battleLog.append(result);
 
-        // Send the battle log to both players
         player1.sendBattleResult(battleLog.toString());
         player2.sendBattleResult(battleLog.toString());
+
+        synchronized (player1.getBattleLock()) {
+            player1.getBattleLock().notifyAll();
+        }
+        synchronized (player2.getBattleLock()) {
+            player2.getBattleLock().notifyAll();
+        }
     }
 
-    private double calculateDamage(Card attacker, Card defender) {
+    private double calculateDamage(Card attacker, Card defender, Player attackingPlayer) {
         double damage = attacker.getDamage();
 
-        // Wenn mindestens eine Karte eine SpellCard ist, berücksichtige Element-Effektivität
+        // Check if booster applies
+        if (attackingPlayer.isBoosterCard(attacker)) {
+            damage *= 2; // Double damage once
+            battleLog.append(attackingPlayer.getUsername()).append("'s booster card effect activates! Damage doubled.\n");
+            attackingPlayer.markBoosterUsed();
+        }
+
+        // If at least one card is a SpellCard, consider element effectiveness
         if (attacker instanceof SpellCard || defender instanceof SpellCard) {
             String attackerElement = getElementType(attacker);
             String defenderElement = getElementType(defender);
@@ -117,7 +127,7 @@ public class Battle {
         String name1 = card1.getName().toLowerCase();
         String name2 = card2.getName().toLowerCase();
 
-        // Goblins sind zu ängstlich, um gegen Drachen zu kämpfen
+        // Goblins are too afraid of Dragons
         if (name1.contains("goblin") && name2.contains("dragon")) {
             battleLog.append("Goblins are too afraid of Dragons to attack.\n");
             battleLog.append(player2.getUsername()).append(" wins the round!\n\n");
@@ -132,22 +142,22 @@ public class Battle {
             return true;
         }
 
-        // Wizzards können Orks kontrollieren
+        // Wizzard can control Orks
         if (name1.contains("wizzard") && name2.contains("ork")) {
-            battleLog.append("Wizzards can control Orks.\n");
+            battleLog.append("Wizzard can control Orks.\n");
             battleLog.append(player1.getUsername()).append(" wins the round!\n\n");
             player1.addCard(card2);
             player2.removeCard(card2);
             return true;
         } else if (name2.contains("wizzard") && name1.contains("ork")) {
-            battleLog.append("Wizzards can control Orks.\n");
+            battleLog.append("Wizzard can control Orks.\n");
             battleLog.append(player2.getUsername()).append(" wins the round!\n\n");
             player2.addCard(card1);
             player1.removeCard(card1);
             return true;
         }
 
-        // Knights ertrinken, wenn sie von WaterSpells angegriffen werden
+        // Knights drown when attacked by WaterSpells
         if (name1.contains("waterspell") && name2.contains("knight")) {
             battleLog.append("Knights drown when attacked by WaterSpells.\n");
             battleLog.append(player1.getUsername()).append(" wins the round!\n\n");
@@ -162,7 +172,7 @@ public class Battle {
             return true;
         }
 
-        // Der Kraken ist immun gegen Zauber
+        // The Kraken is immune against spells
         if (card1 instanceof SpellCard && name2.contains("kraken")) {
             battleLog.append("The Kraken is immune against spells.\n");
             battleLog.append(player2.getUsername()).append(" wins the round!\n\n");
@@ -177,7 +187,7 @@ public class Battle {
             return true;
         }
 
-        // FireElves können Drachen ausweichen
+        // FireElves can evade Dragons
         if (name1.contains("fireelf") && name2.contains("dragon")) {
             battleLog.append("FireElves can evade Dragons.\n");
             battleLog.append("It's a draw!\n\n");
@@ -196,7 +206,6 @@ public class Battle {
             UserDatabase.updateUserElo(winner, 3);
             UserDatabase.updateUserElo(loser, -5);
         }
-        // Anzahl der gespielten Spiele aktualisieren
         UserDatabase.incrementGamesPlayed(winner);
         UserDatabase.incrementGamesPlayed(loser);
     }

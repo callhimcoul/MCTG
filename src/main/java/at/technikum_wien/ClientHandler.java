@@ -65,139 +65,49 @@ public class ClientHandler implements Runnable {
                     String method = requestParts[0];
                     String path = requestParts[1];
 
-                    // Public endpoints (no token required)
+                    // Routing Logik
                     if (method.equals("GET") && path.equals("/")) {
                         sendResponse(writer, "Hello, World!", 200);
                     } else if (method.equals("POST") && path.equals("/users")) {
-                        // Registration is public
                         handleUserRegistration(body, writer, objectMapper);
                     } else if (method.equals("POST") && path.equals("/sessions")) {
-                        // Login is public
                         handleUserLogin(body, writer, objectMapper);
-
-                        // Admin-only endpoint
                     } else if (method.equals("POST") && path.equals("/packages")) {
-                        // requires admin
-                        String token = getTokenFromHeader(headers.get("Authorization"));
-                        if (!requireAdmin(token, writer)) {
-                            closeResources(reader, writer, clientSocket);
-                            return;
-                        }
-                        handlePackageCreation(body, token, writer, objectMapper);
-
-                        // Authenticated endpoints
+                        handlePackageCreation(body, headers.get("Authorization"), writer, objectMapper);
                     } else if (method.equals("POST") && path.equals("/transactions/packages")) {
-                        String username = requireUser(headers.get("Authorization"), writer);
-                        if (username == null) {
-                            closeResources(reader, writer, clientSocket);
-                            return;
-                        }
-                        handlePackagePurchase(username, writer, objectMapper);
-
+                        handlePackagePurchase(headers.get("Authorization"), writer, objectMapper);
                     } else if (method.equals("GET") && path.equals("/cards")) {
-                        String username = requireUser(headers.get("Authorization"), writer);
-                        if (username == null) {
-                            closeResources(reader, writer, clientSocket);
-                            return;
-                        }
-                        handleGetUserCards(username, writer, objectMapper);
-
+                        handleGetUserCards(headers.get("Authorization"), writer, objectMapper);
                     } else if (method.equals("GET") && path.equals("/deck")) {
-                        String username = requireUser(headers.get("Authorization"), writer);
-                        if (username == null) {
-                            closeResources(reader, writer, clientSocket);
-                            return;
-                        }
-                        handleGetDeck(username, writer, objectMapper);
-
+                        handleGetDeck(headers.get("Authorization"), writer, objectMapper);
                     } else if (method.equals("PUT") && path.equals("/deck")) {
-                        String username = requireUser(headers.get("Authorization"), writer);
-                        if (username == null) {
-                            closeResources(reader, writer, clientSocket);
-                            return;
-                        }
-                        handleSetDeck(body, username, writer, objectMapper);
-
+                        handleSetDeck(body, headers.get("Authorization"), writer, objectMapper);
                     } else if (method.equals("GET") && path.matches("/users/[^/]+")) {
-                        String token = getTokenFromHeader(headers.get("Authorization"));
-                        String requester = UserDatabase.getUsernameByToken(token);
-                        if (requester == null) {
-                            sendResponse(writer, "Unauthorized", 401);
-                            closeResources(reader, writer, clientSocket);
-                            return;
-                        }
                         String username = path.substring("/users/".length());
-                        if (!requireSameUserOrAdmin(requester, token, username, writer)) {
-                            closeResources(reader, writer, clientSocket);
-                            return;
-                        }
-                        handleGetUser(username, writer, objectMapper);
-
-                    } else if (method.equals("PUT") && path.matches("/users/[^/]+")) {
-                        String token = getTokenFromHeader(headers.get("Authorization"));
-                        String requester = UserDatabase.getUsernameByToken(token);
-                        if (requester == null) {
-                            sendResponse(writer, "Unauthorized", 401);
-                            closeResources(reader, writer, clientSocket);
-                            return;
-                        }
+                        handleGetUser(username, writer, objectMapper, headers);
+                    } else if (method.equals("PUT") && path.matches("/users/[^/]+$")) {
                         String username = path.substring("/users/".length());
-                        if (!requireSameUserOrAdmin(requester, token, username, writer)) {
-                            closeResources(reader, writer, clientSocket);
-                            return;
-                        }
-                        handleUpdateUser(username, body, writer, objectMapper);
-
+                        handleUpdateUser(username, body, headers.get("Authorization"), writer, objectMapper);
+                    }
+                    // New endpoint for unique feature: set booster card
+                    else if (method.equals("PUT") && path.matches("/users/[^/]+/booster")) {
+                        String userPart = path.substring("/users/".length());
+                        String username = userPart.substring(0, userPart.indexOf("/booster"));
+                        handleSetBoosterCard(username, body, headers.get("Authorization"), writer, objectMapper);
                     } else if (method.equals("POST") && path.equals("/battles")) {
-                        String username = requireUser(headers.get("Authorization"), writer);
-                        if (username == null) {
-                            closeResources(reader, writer, clientSocket);
-                            return;
-                        }
                         keepConnectionOpen = true;
-                        handleBattleRequest(username, writer, objectMapper);
-
+                        handleBattleRequest(headers.get("Authorization"), writer, objectMapper);
                     } else if (method.equals("GET") && path.equals("/scoreboard")) {
-                        String username = requireUser(headers.get("Authorization"), writer);
-                        if (username == null) {
-                            closeResources(reader, writer, clientSocket);
-                            return;
-                        }
-                        handleGetScoreboard(writer, objectMapper);
-
+                        handleGetScoreboard(headers.get("Authorization"), writer, objectMapper);
                     } else if (method.equals("GET") && path.equals("/stats")) {
-                        String username = requireUser(headers.get("Authorization"), writer);
-                        if (username == null) {
-                            closeResources(reader, writer, clientSocket);
-                            return;
-                        }
-                        handleGetUserStats(username, writer, objectMapper);
-
+                        handleGetUserStats(headers.get("Authorization"), writer, objectMapper);
                     } else if (method.equals("POST") && path.equals("/tradings")) {
-                        String username = requireUser(headers.get("Authorization"), writer);
-                        if (username == null) {
-                            closeResources(reader, writer, clientSocket);
-                            return;
-                        }
-                        handleCreateTradingDeal(body, username, writer, objectMapper);
-
+                        handleCreateTradingDeal(body, headers.get("Authorization"), writer, objectMapper);
                     } else if (method.equals("GET") && path.equals("/tradings")) {
-                        String username = requireUser(headers.get("Authorization"), writer);
-                        if (username == null) {
-                            closeResources(reader, writer, clientSocket);
-                            return;
-                        }
-                        handleGetTradingDeals(writer, objectMapper);
-
+                        handleGetTradingDeals(headers.get("Authorization"), writer, objectMapper);
                     } else if (method.equals("POST") && path.matches("/tradings/[^/]+")) {
-                        String buyer = requireUser(headers.get("Authorization"), writer);
-                        if (buyer == null) {
-                            closeResources(reader, writer, clientSocket);
-                            return;
-                        }
                         String dealId = path.substring("/tradings/".length());
-                        handleAcceptTradingDeal(dealId, body, buyer, writer, objectMapper);
-
+                        handleAcceptTradingDeal(dealId, body, headers.get("Authorization"), writer, objectMapper);
                     } else {
                         sendResponse(writer, "Not Found", 404);
                     }
@@ -205,7 +115,9 @@ public class ClientHandler implements Runnable {
             }
 
             if (!keepConnectionOpen) {
-                closeResources(reader, writer, clientSocket);
+                if (reader != null) reader.close();
+                if (writer != null) writer.close();
+                if (clientSocket != null && !clientSocket.isClosed()) clientSocket.close();
             }
 
         } catch (IOException e) {
@@ -213,56 +125,9 @@ public class ClientHandler implements Runnable {
         }
     }
 
-    // --- Security and Helper Methods ---
-
-    private void closeResources(BufferedReader reader, BufferedWriter writer, Socket socket) throws IOException {
-        if (reader != null) reader.close();
-        if (writer != null) writer.close();
-        if (socket != null && !socket.isClosed()) socket.close();
-    }
-
-    private String requireUser(String authHeader, BufferedWriter writer) throws IOException {
-        String token = getTokenFromHeader(authHeader);
-        String username = UserDatabase.getUsernameByToken(token);
-        if (username == null) {
-            sendResponse(writer, "Unauthorized", 401);
-            return null;
-        }
-        return username;
-    }
-
-    private boolean requireAdmin(String token, BufferedWriter writer) throws IOException {
-        if (token == null || !isAdmin(token)) {
-            sendResponse(writer, "Unauthorized (Admin required)", 401);
-            return false;
-        }
-        return true;
-    }
-
-    private boolean requireSameUserOrAdmin(String requester, String token, String targetUser, BufferedWriter writer) throws IOException {
-        if (!requester.equals(targetUser) && !isAdmin(token)) {
-            sendResponse(writer, "Unauthorized", 401);
-            return false;
-        }
-        return true;
-    }
-
-    private String getTokenFromHeader(String authHeader) {
-        if (authHeader != null && authHeader.startsWith("Bearer ")) {
-            return authHeader.substring(7).trim();
-        }
-        return null;
-    }
-
-    private boolean isAdmin(String token) {
-        return "admin-mtcgToken".equals(token);
-    }
-
-    // --- Handlers below (adjusted to use the new security methods) ---
-
     private void handleUserRegistration(String body, BufferedWriter writer, ObjectMapper objectMapper) throws IOException {
         try {
-            Map<String, String> userData = objectMapper.readValue(body, new TypeReference<>() {});
+            Map<String, String> userData = objectMapper.readValue(body, new TypeReference<Map<String, String>>() {});
             String username = userData.get("Username");
             String password = userData.get("Password");
 
@@ -284,7 +149,7 @@ public class ClientHandler implements Runnable {
 
     private void handleUserLogin(String body, BufferedWriter writer, ObjectMapper objectMapper) throws IOException {
         try {
-            Map<String, String> credentials = objectMapper.readValue(body, new TypeReference<>() {});
+            Map<String, String> credentials = objectMapper.readValue(body, new TypeReference<Map<String, String>>() {});
             String username = credentials.get("Username");
             String password = credentials.get("Password");
 
@@ -312,9 +177,15 @@ public class ClientHandler implements Runnable {
         }
     }
 
-    private void handlePackageCreation(String body, String token, BufferedWriter writer, ObjectMapper objectMapper) throws IOException {
+    private void handlePackageCreation(String body, String authHeader, BufferedWriter writer, ObjectMapper objectMapper) throws IOException {
+        String token = getTokenFromHeader(authHeader);
+        if (token == null || !isAdmin(token)) {
+            sendResponse(writer, "Unauthorized", 401);
+            return;
+        }
+
         try {
-            List<Card> cards = objectMapper.readValue(body, new TypeReference<>() {});
+            List<Card> cards = objectMapper.readValue(body, new TypeReference<List<Card>>() {});
             boolean packageCreated = PackageDatabase.createPackage(cards);
             if (packageCreated) {
                 sendResponse(writer, "Package Created", 201);
@@ -326,7 +197,14 @@ public class ClientHandler implements Runnable {
         }
     }
 
-    private void handlePackagePurchase(String username, BufferedWriter writer, ObjectMapper objectMapper) throws IOException {
+    private void handlePackagePurchase(String authHeader, BufferedWriter writer, ObjectMapper objectMapper) throws IOException {
+        String token = getTokenFromHeader(authHeader);
+        String username = UserDatabase.getUsernameByToken(token);
+        if (username == null) {
+            sendResponse(writer, "Unauthorized", 401);
+            return;
+        }
+
         boolean success = PackageDatabase.purchasePackage(username);
         if (success) {
             sendResponse(writer, "Package Purchased", 200);
@@ -335,7 +213,14 @@ public class ClientHandler implements Runnable {
         }
     }
 
-    private void handleGetUserCards(String username, BufferedWriter writer, ObjectMapper objectMapper) throws IOException {
+    private void handleGetUserCards(String authHeader, BufferedWriter writer, ObjectMapper objectMapper) throws IOException {
+        String token = getTokenFromHeader(authHeader);
+        String username = UserDatabase.getUsernameByToken(token);
+        if (username == null) {
+            sendResponse(writer, "Unauthorized", 401);
+            return;
+        }
+
         List<Card> cards = UserDatabase.getUserCards(username);
         if (cards != null) {
             String jsonResponse = objectMapper.writeValueAsString(cards);
@@ -345,7 +230,14 @@ public class ClientHandler implements Runnable {
         }
     }
 
-    private void handleGetDeck(String username, BufferedWriter writer, ObjectMapper objectMapper) throws IOException {
+    private void handleGetDeck(String authHeader, BufferedWriter writer, ObjectMapper objectMapper) throws IOException {
+        String token = getTokenFromHeader(authHeader);
+        String username = UserDatabase.getUsernameByToken(token);
+        if (username == null) {
+            sendResponse(writer, "Unauthorized", 401);
+            return;
+        }
+
         List<Card> deck = UserDatabase.getUserDeck(username);
         if (deck != null) {
             String jsonResponse = objectMapper.writeValueAsString(deck);
@@ -355,9 +247,16 @@ public class ClientHandler implements Runnable {
         }
     }
 
-    private void handleSetDeck(String body, String username, BufferedWriter writer, ObjectMapper objectMapper) throws IOException {
+    private void handleSetDeck(String body, String authHeader, BufferedWriter writer, ObjectMapper objectMapper) throws IOException {
+        String token = getTokenFromHeader(authHeader);
+        String username = UserDatabase.getUsernameByToken(token);
+        if (username == null) {
+            sendResponse(writer, "Unauthorized", 401);
+            return;
+        }
+
         try {
-            List<String> cardIds = objectMapper.readValue(body, new TypeReference<>() {});
+            List<String> cardIds = objectMapper.readValue(body, new TypeReference<List<String>>() {});
             boolean deckSet = UserDatabase.setUserDeck(username, cardIds);
             if (deckSet) {
                 sendResponse(writer, "Deck Set", 200);
@@ -370,7 +269,16 @@ public class ClientHandler implements Runnable {
         }
     }
 
-    private void handleGetUser(String username, BufferedWriter writer, ObjectMapper objectMapper) throws IOException {
+    private void handleGetUser(String username, BufferedWriter writer, ObjectMapper objectMapper, Map<String, String> headers) throws IOException {
+        String authHeader = headers.get("Authorization");
+        String token = getTokenFromHeader(authHeader);
+        String requester = UserDatabase.getUsernameByToken(token);
+
+        if (requester == null || (!requester.equals(username) && !isAdmin(token))) {
+            sendResponse(writer, "Unauthorized", 401);
+            return;
+        }
+
         User user = UserDatabase.getUser(username);
         if (user != null) {
             String jsonResponse = objectMapper.writeValueAsString(user);
@@ -380,9 +288,16 @@ public class ClientHandler implements Runnable {
         }
     }
 
-    private void handleUpdateUser(String username, String body, BufferedWriter writer, ObjectMapper objectMapper) throws IOException {
+    private void handleUpdateUser(String username, String body, String authHeader, BufferedWriter writer, ObjectMapper objectMapper) throws IOException {
+        String token = getTokenFromHeader(authHeader);
+        String requester = UserDatabase.getUsernameByToken(token);
+        if (requester == null || (!requester.equals(username) && !isAdmin(token))) {
+            sendResponse(writer, "Unauthorized", 401);
+            return;
+        }
+
         try {
-            Map<String, String> userData = objectMapper.readValue(body, new TypeReference<>() {});
+            Map<String, String> userData = objectMapper.readValue(body, new TypeReference<Map<String, String>>() {});
             String newBio = userData.getOrDefault("Bio", "");
             String newImage = userData.getOrDefault("Image", "");
 
@@ -398,9 +313,49 @@ public class ClientHandler implements Runnable {
         }
     }
 
+    // New endpoint to set the booster card
+    private void handleSetBoosterCard(String username, String body, String authHeader, BufferedWriter writer, ObjectMapper objectMapper) throws IOException {
+        String token = getTokenFromHeader(authHeader);
+        String requester = UserDatabase.getUsernameByToken(token);
+        if (requester == null || (!requester.equals(username) && !isAdmin(token))) {
+            sendResponse(writer, "Unauthorized", 401);
+            return;
+        }
+
+        try {
+            Map<String, String> requestData = objectMapper.readValue(body, new TypeReference<Map<String, String>>() {});
+            String boosterCardId = requestData.get("CardId");
+
+            // Check if user owns this card and not in deck check not required for booster
+            if (!UserDatabase.isCardOwnedByUser(username, boosterCardId)) {
+                sendResponse(writer, "Forbidden: You don't own this card.", 403);
+                return;
+            }
+
+            boolean updated = UserDatabase.updateUserBoosterCard(username, boosterCardId);
+            if (updated) {
+                sendResponse(writer, "Booster card set successfully", 200);
+            } else {
+                sendResponse(writer, "Not Found", 404);
+            }
+
+        } catch (JsonProcessingException e) {
+            sendResponse(writer, "Bad Request", 400);
+        }
+    }
+
     private final Object battleLock = new Object();
 
-    private void handleBattleRequest(String username, BufferedWriter writer, ObjectMapper objectMapper) throws IOException {
+    private void handleBattleRequest(String authHeader, BufferedWriter writer, ObjectMapper objectMapper) throws IOException {
+        String token = getTokenFromHeader(authHeader);
+        String username = UserDatabase.getUsernameByToken(token);
+        if (username == null) {
+            sendResponse(writer, "Unauthorized", 401);
+            writer.close();
+            if (clientSocket != null && !clientSocket.isClosed()) clientSocket.close();
+            return;
+        }
+
         List<Card> deck = UserDatabase.getUserDeck(username);
         if (deck == null || deck.size() != 4) {
             sendResponse(writer, "Deck not configured properly. Ensure you have exactly 4 cards in your deck.", 400);
@@ -409,7 +364,10 @@ public class ClientHandler implements Runnable {
             return;
         }
 
-        Player player = new Player(username, deck, writer, battleLock);
+        User user = UserDatabase.getUser(username);
+        String boosterCardId = (user != null) ? user.getBoosterCardId() : null;
+
+        Player player = new Player(username, deck, writer, battleLock, boosterCardId);
         BattleHandler.enqueuePlayer(player);
 
         synchronized (battleLock) {
@@ -424,7 +382,14 @@ public class ClientHandler implements Runnable {
         if (clientSocket != null && !clientSocket.isClosed()) clientSocket.close();
     }
 
-    private void handleGetUserStats(String username, BufferedWriter writer, ObjectMapper objectMapper) throws IOException {
+    private void handleGetUserStats(String authHeader, BufferedWriter writer, ObjectMapper objectMapper) throws IOException {
+        String token = getTokenFromHeader(authHeader);
+        String username = UserDatabase.getUsernameByToken(token);
+        if (username == null) {
+            sendResponse(writer, "Unauthorized", 401);
+            return;
+        }
+
         User user = UserDatabase.getUser(username);
         if (user != null) {
             String jsonResponse = objectMapper.writeValueAsString(user);
@@ -434,7 +399,14 @@ public class ClientHandler implements Runnable {
         }
     }
 
-    private void handleCreateTradingDeal(String body, String username, BufferedWriter writer, ObjectMapper objectMapper) throws IOException {
+    private void handleCreateTradingDeal(String body, String authHeader, BufferedWriter writer, ObjectMapper objectMapper) throws IOException {
+        String token = getTokenFromHeader(authHeader);
+        String username = UserDatabase.getUsernameByToken(token);
+        if (username == null) {
+            sendResponse(writer, "Unauthorized", 401);
+            return;
+        }
+
         try {
             TradingDeal deal = objectMapper.readValue(body, TradingDeal.class);
             deal.setOwner(username);
@@ -456,15 +428,29 @@ public class ClientHandler implements Runnable {
         }
     }
 
-    private void handleGetTradingDeals(BufferedWriter writer, ObjectMapper objectMapper) throws IOException {
+    private void handleGetTradingDeals(String authHeader, BufferedWriter writer, ObjectMapper objectMapper) throws IOException {
+        String token = getTokenFromHeader(authHeader);
+        String username = UserDatabase.getUsernameByToken(token);
+        if (username == null) {
+            sendResponse(writer, "Unauthorized", 401);
+            return;
+        }
+
         List<TradingDeal> deals = TradingDatabase.getAllTradingDeals();
         String jsonResponse = objectMapper.writeValueAsString(deals);
         sendJsonResponse(writer, jsonResponse, 200);
     }
 
-    private void handleAcceptTradingDeal(String dealId, String body, String buyer, BufferedWriter writer, ObjectMapper objectMapper) throws IOException {
+    private void handleAcceptTradingDeal(String dealId, String body, String authHeader, BufferedWriter writer, ObjectMapper objectMapper) throws IOException {
+        String token = getTokenFromHeader(authHeader);
+        String buyer = UserDatabase.getUsernameByToken(token);
+        if (buyer == null) {
+            sendResponse(writer, "Unauthorized", 401);
+            return;
+        }
+
         try {
-            Map<String, String> requestData = objectMapper.readValue(body, new TypeReference<>() {});
+            Map<String, String> requestData = objectMapper.readValue(body, new TypeReference<Map<String, String>>() {});
             String offeredCardId = requestData.get("cardId");
 
             if (!UserDatabase.isCardOwnedByUser(buyer, offeredCardId) || UserDatabase.isCardInDeck(buyer, offeredCardId)) {
@@ -474,7 +460,7 @@ public class ClientHandler implements Runnable {
 
             boolean success = TradingDatabase.acceptTradingDeal(dealId, buyer, offeredCardId);
             if (success) {
-                sendResponse(writer, "Trading deal accepted successfully", 200);
+                sendResponse(writer, "Trading deal accepted successfully.", 200);
             } else {
                 sendResponse(writer, "Not Found or Conflict: Could not accept trading deal.", 409);
             }
@@ -484,10 +470,28 @@ public class ClientHandler implements Runnable {
         }
     }
 
-    private void handleGetScoreboard(BufferedWriter writer, ObjectMapper objectMapper) throws IOException {
+    private void handleGetScoreboard(String authHeader, BufferedWriter writer, ObjectMapper objectMapper) throws IOException {
+        String token = getTokenFromHeader(authHeader);
+        String username = UserDatabase.getUsernameByToken(token);
+        if (username == null) {
+            sendResponse(writer, "Unauthorized", 401);
+            return;
+        }
+
         List<User> users = UserDatabase.getAllUsersSortedByElo();
         String jsonResponse = objectMapper.writeValueAsString(users);
         sendJsonResponse(writer, jsonResponse, 200);
+    }
+
+    private String getTokenFromHeader(String authHeader) {
+        if (authHeader != null && authHeader.startsWith("Bearer ")) {
+            return authHeader.substring(7).trim();
+        }
+        return null;
+    }
+
+    private boolean isAdmin(String token) {
+        return "admin-mtcgToken".equals(token);
     }
 
     private void sendResponse(BufferedWriter writer, String body, int statusCode) throws IOException {

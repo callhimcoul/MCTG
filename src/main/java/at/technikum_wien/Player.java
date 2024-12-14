@@ -1,8 +1,6 @@
 package at.technikum_wien;
 
 import at.technikum_wien.cards.Card;
-import at.technikum_wien.cards.MonsterCard;
-import at.technikum_wien.cards.SpellCard;
 
 import java.io.BufferedWriter;
 import java.io.IOException;
@@ -15,12 +13,26 @@ public class Player {
     private List<Card> deck;
     private BufferedWriter writer;
     private Object battleLock;
+    private String boosterCardId; // The chosen booster card
+    private boolean boosterUsed;  // Tracks if booster was used this battle
 
     public Player(String username, List<Card> deck, BufferedWriter writer, Object battleLock) {
         this.username = username;
         this.deck = new ArrayList<>(deck);
         this.writer = writer;
         this.battleLock = battleLock;
+        this.boosterCardId = null;
+        this.boosterUsed = false;
+    }
+
+    // New constructor with booster card
+    public Player(String username, List<Card> deck, BufferedWriter writer, Object battleLock, String boosterCardId) {
+        this.username = username;
+        this.deck = new ArrayList<>(deck);
+        this.writer = writer;
+        this.battleLock = battleLock;
+        this.boosterCardId = boosterCardId;
+        this.boosterUsed = false;
     }
 
     public String getUsername() {
@@ -49,15 +61,10 @@ public class Player {
 
     public void sendBattleResult(String battleLog) throws IOException {
         sendResponse(writer, battleLog, 200);
-
-        // Nach dem Senden des Ergebnisses den Thread benachrichtigen
-        synchronized (battleLock) {
-            battleLock.notify();
-        }
     }
 
     private void sendResponse(BufferedWriter writer, String body, int statusCode) throws IOException {
-        String response = "HTTP/1.1 " + statusCode + " " + getReasonPhrase(statusCode) + "\r\n" +
+        String response = "HTTP/1.1 " + statusCode + " OK\r\n" +
                 "Content-Type: text/plain\r\n" +
                 "Content-Length: " + body.getBytes("UTF-8").length + "\r\n" +
                 "\r\n" +
@@ -66,17 +73,17 @@ public class Player {
         writer.flush();
     }
 
-    private String getReasonPhrase(int statusCode) {
-        return switch (statusCode) {
-            case 200 -> "OK";
-            case 201 -> "Created";
-            case 400 -> "Bad Request";
-            case 401 -> "Unauthorized";
-            case 403 -> "Forbidden";
-            case 404 -> "Not Found";
-            case 409 -> "Conflict";
-            case 500 -> "Internal Server Error";
-            default -> "";
-        };
+    public Object getBattleLock() {
+        return battleLock;
+    }
+
+    // Unique feature logic: Check if this card is the booster card and if booster is not used yet
+    public boolean isBoosterCard(Card card) {
+        if (boosterCardId == null) return false;
+        return card.getId().equals(boosterCardId) && !boosterUsed;
+    }
+
+    public void markBoosterUsed() {
+        this.boosterUsed = true;
     }
 }

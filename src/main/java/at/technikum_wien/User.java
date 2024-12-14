@@ -6,36 +6,40 @@ public class User {
     private int elo;
     private String bio;
     private String image;
-    private int gamesPlayed; // Neues Feld für die Anzahl der gespielten Spiele
+    private int gamesPlayed;
+    private String boosterCardId; // New field for unique feature
 
     // Konstruktor mit den ursprünglichen Feldern
     public User(String username, int coins, int elo) {
         this.username = username;
         this.coins = coins;
         this.elo = elo;
-        this.bio = "";         // Standardwert
-        this.image = "";       // Standardwert
-        this.gamesPlayed = 0;  // Standardwert
+        this.bio = "";
+        this.image = "";
+        this.gamesPlayed = 0;
+        this.boosterCardId = null;
     }
 
-    // Konstruktor mit allen Feldern außer gamesPlayed
+    // Konstruktor mit allen Feldern außer gamesPlayed und boosterCardId
     public User(String username, int coins, int elo, String bio, String image) {
         this.username = username;
         this.coins = coins;
         this.elo = elo;
         this.bio = bio;
         this.image = image;
-        this.gamesPlayed = 0;  // Standardwert
+        this.gamesPlayed = 0;
+        this.boosterCardId = null;
     }
 
-    // Neuer Konstruktor mit allen Feldern einschließlich gamesPlayed
-    public User(String username, int coins, int elo, String bio, String image, int gamesPlayed) {
+    // Neuer Konstruktor mit allen Feldern einschließlich gamesPlayed und boosterCardId
+    public User(String username, int coins, int elo, String bio, String image, int gamesPlayed, String boosterCardId) {
         this.username = username;
         this.coins = coins;
         this.elo = elo;
         this.bio = bio;
         this.image = image;
         this.gamesPlayed = gamesPlayed;
+        this.boosterCardId = boosterCardId;
     }
 
     // Getter-Methoden
@@ -63,6 +67,10 @@ public class User {
         return gamesPlayed;
     }
 
+    public String getBoosterCardId() {
+        return boosterCardId;
+    }
+
     // Setter-Methoden
     public void setCoins(int coins) {
         this.coins = coins;
@@ -82,5 +90,9 @@ public class User {
 
     public void setGamesPlayed(int gamesPlayed) {
         this.gamesPlayed = gamesPlayed;
+    }
+
+    public void setBoosterCardId(String boosterCardId) {
+        this.boosterCardId = boosterCardId;
     }
 }

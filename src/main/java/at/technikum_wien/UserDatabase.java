@@ -11,6 +11,7 @@ import java.util.List;
 import java.util.UUID;
 
 public class UserDatabase {
+
     public static boolean createUser(String username, String password) {
         String insertUser = "INSERT INTO users (username, password, coins, elo) VALUES (?, ?, 20, 100)";
         try (Connection conn = Database.getConnection();
@@ -331,7 +332,7 @@ public class UserDatabase {
     }
 
     public static User getUser(String username) {
-        String query = "SELECT username, coins, elo, bio, image, games_played FROM users WHERE username = ?";
+        String query = "SELECT username, coins, elo, bio, image, games_played, booster_card_id FROM users WHERE username = ?";
         try (Connection conn = Database.getConnection();
              PreparedStatement stmt = conn.prepareStatement(query)) {
 
@@ -344,7 +345,8 @@ public class UserDatabase {
                 String bio = rs.getString("bio");
                 String image = rs.getString("image");
                 int gamesPlayed = rs.getInt("games_played");
-                return new User(uname, coins, elo, bio, image, gamesPlayed);
+                String boosterCardId = rs.getString("booster_card_id");
+                return new User(uname, coins, elo, bio, image, gamesPlayed, boosterCardId);
             } else {
                 return null;
             }
@@ -486,7 +488,7 @@ public class UserDatabase {
     }
 
     public static List<User> getAllUsersSortedByElo() {
-        String query = "SELECT username, coins, elo, bio, image FROM users ORDER BY elo DESC";
+        String query = "SELECT username, coins, elo, bio, image, booster_card_id FROM users ORDER BY elo DESC";
         List<User> users = new ArrayList<>();
         try (Connection conn = Database.getConnection();
              PreparedStatement stmt = conn.prepareStatement(query);
@@ -498,7 +500,11 @@ public class UserDatabase {
                 int elo = rs.getInt("elo");
                 String bio = rs.getString("bio");
                 String image = rs.getString("image");
-                users.add(new User(username, coins, elo, bio, image));
+                String boosterCardId = rs.getString("booster_card_id");
+                User u = new User(username, coins, elo, bio, image, 0, boosterCardId);
+                // gamesPlayed will be 0 here - not retrieved by this query,
+                // but not critical for scoreboard display
+                users.add(u);
             }
             return users;
 
@@ -537,6 +543,26 @@ public class UserDatabase {
                 return false;
             }
 
+        } catch (SQLException e) {
+            e.printStackTrace();
+            return false;
+        }
+    }
+
+    // New method to update the booster card of a user
+    public static boolean updateUserBoosterCard(String username, String boosterCardId) {
+        String updateBooster = "UPDATE users SET booster_card_id = ? WHERE username = ?";
+        try (Connection conn = Database.getConnection();
+             PreparedStatement stmt = conn.prepareStatement(updateBooster)) {
+
+            if (boosterCardId != null) {
+                stmt.setObject(1, UUID.fromString(boosterCardId));
+            } else {
+                stmt.setNull(1, Types.OTHER);
+            }
+            stmt.setString(2, username);
+            int rowsAffected = stmt.executeUpdate();
+            return rowsAffected == 1;
         } catch (SQLException e) {
             e.printStackTrace();
             return false;
