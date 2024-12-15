@@ -13,8 +13,8 @@ public class Player {
     private List<Card> deck;
     private BufferedWriter writer;
     private Object battleLock;
-    private String boosterCardId; // The chosen booster card
-    private boolean boosterUsed;  // Tracks if booster was used this battle
+    private String boosterCardId;
+    private boolean boosterUsed;
 
     public Player(String username, List<Card> deck, BufferedWriter writer, Object battleLock) {
         this.username = username;
@@ -25,7 +25,6 @@ public class Player {
         this.boosterUsed = false;
     }
 
-    // New constructor with booster card
     public Player(String username, List<Card> deck, BufferedWriter writer, Object battleLock, String boosterCardId) {
         this.username = username;
         this.deck = new ArrayList<>(deck);
@@ -49,11 +48,22 @@ public class Player {
         return deck.get(index);
     }
 
+    /**
+     * Adds a card to the player's deck and DB, but only if the player does not already own this card.
+     */
     public void addCard(Card card) {
-        deck.add(card);
-        UserDatabase.addCardToUser(username, card.getId());
+        if (!UserDatabase.isCardOwnedByUser(username, card.getId())) {
+            UserDatabase.addCardToUser(username, card.getId());
+        }
+        // Ensure the deck list contains the card
+        if (!deckContainsCard(card.getId())) {
+            deck.add(card);
+        }
     }
 
+    /**
+     * Removes a card from the player's deck and from the DB.
+     */
     public void removeCard(Card card) {
         deck.remove(card);
         UserDatabase.removeCardFromUser(username, card.getId());
@@ -77,7 +87,6 @@ public class Player {
         return battleLock;
     }
 
-    // Unique feature logic: Check if this card is the booster card and if booster is not used yet
     public boolean isBoosterCard(Card card) {
         if (boosterCardId == null) return false;
         return card.getId().equals(boosterCardId) && !boosterUsed;
@@ -85,5 +94,12 @@ public class Player {
 
     public void markBoosterUsed() {
         this.boosterUsed = true;
+    }
+
+    private boolean deckContainsCard(String cardId) {
+        for (Card c : deck) {
+            if (c.getId().equals(cardId)) return true;
+        }
+        return false;
     }
 }

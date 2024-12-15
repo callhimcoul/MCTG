@@ -12,6 +12,13 @@ import java.util.UUID;
 
 public class UserDatabase {
 
+    /**
+     * Erstellt einen neuen Benutzer in der Datenbank.
+     *
+     * @param username Benutzername
+     * @param password Passwort (im Klartext, sollte gehasht gespeichert werden)
+     * @return true, wenn der Benutzer erfolgreich erstellt wurde, sonst false
+     */
     public static boolean createUser(String username, String password) {
         String insertUser = "INSERT INTO users (username, password, coins, elo) VALUES (?, ?, 20, 100)";
         try (Connection conn = Database.getConnection();
@@ -28,17 +35,44 @@ public class UserDatabase {
         }
     }
 
-    public static String getCurrentDatabase(Connection conn) {
-        String query = "SELECT current_database()";
-        try (PreparedStatement stmt = conn.prepareStatement(query);
-             ResultSet rs = stmt.executeQuery()) {
-            if (rs.next()) {
-                return rs.getString(1);
+    /**
+     * Löscht einen Benutzer aus der Datenbank.
+     *
+     * @param username Der zu löschende Benutzername
+     * @return true, wenn der Benutzer gelöscht wurde, sonst false
+     */
+    public static boolean deleteUser(String username) {
+        String deleteUserCards = "DELETE FROM user_cards WHERE username = ?";
+        String deleteDeck = "DELETE FROM decks WHERE username = ?";
+        String deleteUser = "DELETE FROM users WHERE username = ?";
+        try (Connection conn = Database.getConnection()) {
+            conn.setAutoCommit(false);
+            try (PreparedStatement stmtDeleteCards = conn.prepareStatement(deleteUserCards);
+                 PreparedStatement stmtDeleteDeck = conn.prepareStatement(deleteDeck);
+                 PreparedStatement stmtDeleteUser = conn.prepareStatement(deleteUser)) {
+
+                stmtDeleteCards.setString(1, username);
+                stmtDeleteCards.executeUpdate();
+
+                stmtDeleteDeck.setString(1, username);
+                stmtDeleteDeck.executeUpdate();
+
+                stmtDeleteUser.setString(1, username);
+                int rows = stmtDeleteUser.executeUpdate();
+
+                conn.commit();
+                return rows > 0;
+            } catch (SQLException e) {
+                conn.rollback();
+                e.printStackTrace();
+                return false;
+            } finally {
+                conn.setAutoCommit(true);
             }
         } catch (SQLException e) {
             e.printStackTrace();
+            return false;
         }
-        return null;
     }
 
     public static boolean authenticateUser(String username, String password) {
@@ -502,8 +536,7 @@ public class UserDatabase {
                 String image = rs.getString("image");
                 String boosterCardId = rs.getString("booster_card_id");
                 User u = new User(username, coins, elo, bio, image, 0, boosterCardId);
-                // gamesPlayed will be 0 here - not retrieved by this query,
-                // but not critical for scoreboard display
+                // gamesPlayed not retrieved here, default 0 is okay for scoreboard display
                 users.add(u);
             }
             return users;
@@ -549,7 +582,6 @@ public class UserDatabase {
         }
     }
 
-    // New method to update the booster card of a user
     public static boolean updateUserBoosterCard(String username, String boosterCardId) {
         String updateBooster = "UPDATE users SET booster_card_id = ? WHERE username = ?";
         try (Connection conn = Database.getConnection();
