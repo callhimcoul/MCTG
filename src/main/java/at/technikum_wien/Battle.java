@@ -106,7 +106,7 @@ public class Battle {
         return "normal";
     }
 
-    private double getEffectivenessMultiplier(String attackerElement, String defenderElement) {
+    public double getEffectivenessMultiplier(String attackerElement, String defenderElement) {
         if (attackerElement.equals("water") && defenderElement.equals("fire")) {
             return 2.0;
         } else if (attackerElement.equals("fire") && defenderElement.equals("water")) {
@@ -127,7 +127,7 @@ public class Battle {
     /**
      * Apply special rules. If a rule applies, the card transfer happens here. Ensure remove first, then add.
      */
-    private boolean applySpecialRules(Card card1, Card card2) {
+    public boolean applySpecialRules(Card card1, Card card2) {
         String name1 = card1.getName().toLowerCase();
         String name2 = card2.getName().toLowerCase();
 
