@@ -7,23 +7,28 @@ import at.technikum_wien.cards.SpellCard;
 import java.sql.*;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.UUID;
 
 public class TradingDatabase {
 
     public static boolean createTradingDeal(TradingDeal deal) {
-        String insertDeal = "INSERT INTO trading_deals (id, owner, card_to_trade, required_type, required_element, minimum_damage) VALUES (?, ?, ?, ?, ?, ?)";
+        String insertDeal = "INSERT INTO trading_deals " +
+                "(id, owner, card_to_trade, required_type, required_element, minimum_damage) " +
+                "VALUES (?, ?, ?, ?, ?, ?)";
         try (Connection conn = Database.getConnection();
              PreparedStatement stmt = conn.prepareStatement(insertDeal)) {
 
-            stmt.setString(1, deal.getId());
-            stmt.setString(2, deal.getOwner());
-            stmt.setString(3, deal.getCardToTrade());
-            stmt.setString(4, deal.getRequiredType());
-            stmt.setString(5, deal.getRequiredElement());
+            // For UUID columns, use setObject(..., UUID.fromString(...))
+            stmt.setObject(1, UUID.fromString(deal.getId()));          // id (UUID)
+            stmt.setString(2, deal.getOwner());                        // owner (text)
+            stmt.setObject(3, UUID.fromString(deal.getCardToTrade())); // card_to_trade (UUID)
+            stmt.setString(4, deal.getRequiredType());                 // required_type (text)
+            stmt.setString(5, deal.getRequiredElement());              // required_element (text)
+
             if (deal.getMinimumDamage() != null) {
                 stmt.setDouble(6, deal.getMinimumDamage());
             } else {
-                stmt.setNull(6, Types.DOUBLE);
+                stmt.setNull(6, java.sql.Types.DOUBLE);
             }
 
             int rowsAffected = stmt.executeUpdate();
@@ -34,6 +39,7 @@ public class TradingDatabase {
             return false;
         }
     }
+
 
     public static List<TradingDeal> getAllTradingDeals() {
         String query = "SELECT * FROM trading_deals";
