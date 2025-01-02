@@ -175,8 +175,6 @@ public class ClientHandler implements Runnable {
         }
     }
 
-    // ------------------ Existing Handlers (Unchanged) ------------------ //
-    // These include:
     // handleUserRegistration, handleUserLogin, handlePackageCreation,
     // handlePackagePurchase, handleGetUserCards, handleGetDeck, handleSetDeck,
     // handleGetUser, handleUpdateUser, handleSetBoosterCard, handleBattleRequest,
@@ -552,7 +550,6 @@ public class ClientHandler implements Runnable {
         }
     }
 
-    // ------------------ New Methods ------------------ //
 
     /**
      * Delete a user (only by themselves or an admin).
@@ -582,7 +579,7 @@ public class ClientHandler implements Runnable {
     }
 
     /**
-     * Update user coins (optional). Adjust logic if you want only admin or both user & admin to do this.
+     * Update user coins (optional).
      */
     private void handleUpdateUserCoins(String username, String body, String authHeader,
                                        BufferedWriter writer, ObjectMapper objectMapper) throws IOException {
@@ -594,7 +591,7 @@ public class ClientHandler implements Runnable {
             return;
         }
 
-        // Example: allow if user is themselves OR an admin
+        // Allow if user is themselves OR an admin
         if (!requestor.equals(username) && !isAdmin(token)) {
             sendResponse(writer, "Forbidden", 403);
             return;

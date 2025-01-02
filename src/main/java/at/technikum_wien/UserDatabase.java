@@ -3,7 +3,6 @@ package at.technikum_wien;
 import at.technikum_wien.cards.Card;
 import at.technikum_wien.cards.MonsterCard;
 import at.technikum_wien.cards.SpellCard;
-import at.technikum_wien.Database;
 
 import java.sql.*;
 import java.util.ArrayList;

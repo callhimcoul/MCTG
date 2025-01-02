@@ -8,7 +8,7 @@ import java.net.Socket;
 public class Main {
     public static void main(String[] args) {
 
-        int port = 10001; // Der Port, auf dem der Server lauscht
+        int port = 10001;
 
         try (ServerSocket serverSocket = new ServerSocket(port)) {
             System.out.println("Server gestartet und hört auf Port " + port);
