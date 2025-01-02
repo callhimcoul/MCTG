@@ -15,15 +15,24 @@ class ClientHandler {
     +handleSetDeck(body, authHeader, writer, objectMapper)
     +handleGetUser(username, writer, objectMapper, headers)
     +handleUpdateUser(username, body, authHeader, writer, objectMapper)
+    +handleSetBoosterCard(username, body, authHeader, writer, objectMapper)
+    +handleBattleRequest(authHeader, writer, objectMapper)
+    +handleGetScoreboard(authHeader, writer, objectMapper)
+    +handleGetUserStats(authHeader, writer, objectMapper)
+    +handleCreateTradingDeal(body, authHeader, writer, objectMapper)
+    +handleGetTradingDeals(authHeader, writer, objectMapper)
+    +handleAcceptTradingDeal(dealId, body, authHeader, writer, objectMapper)
+    +handleDeleteUser(username, authHeader, writer, objectMapper)
+    +handleUpdateUserCoins(username, body, authHeader, writer, objectMapper)
 }
 
 class Database {
     +getConnection(): Connection
-    +getCurrentDatabase(Connection): String
 }
 
 class UserDatabase {
     +createUser(String, String): boolean
+    +deleteUser(String): boolean
     +authenticateUser(String, String): boolean
     +getUserCards(String): List<Card>
     +getUserDeck(String): List<Card>
@@ -31,8 +40,21 @@ class UserDatabase {
     +updateToken(String, String): boolean
     +getUsernameByToken(String): String
     +getUser(String): User
+    +updateUserProfile(String, String, String): boolean
     +updateUserPassword(String, String): boolean
+    +addCardToUser(String, String): void
+    +removeCardFromUser(String, String): void
+    +getCardById(String): Card
+    +isCardOwnedByUser(String, String): boolean
+    +isCardInDeck(String, String): boolean
+    +updateUserCoins(String, int): boolean
+    +getUserCoins(String): int
+    +getUserElo(String): int
+    +updateUserElo(String, int): boolean
     +transferCard(String, String, String): boolean
+    +incrementGamesPlayed(String): boolean
+    +getAllUsersSortedByElo(): List<User>
+    +updateUserBoosterCard(String, String): boolean
 }
 
 class PackageDatabase {
@@ -44,11 +66,50 @@ class User {
     -String username
     -int coins
     -int elo
+    -String bio
+    -String image
+    -int gamesPlayed
+    -String boosterCardId
     +getUsername(): String
     +getCoins(): int
     +getElo(): int
-    +setCoins(int)
-    +setElo(int)
+    +getBio(): String
+    +getImage(): String
+    +getGamesPlayed(): int
+    +getBoosterCardId(): String
+    +setCoins(int): void
+    +setElo(int): void
+    +setBio(String): void
+    +setImage(String): void
+    +setGamesPlayed(int): void
+    +setBoosterCardId(String): void
+}
+
+class TradingDatabase {
+    +createTradingDeal(TradingDeal): boolean
+    +getAllTradingDeals(): List<TradingDeal>
+    +acceptTradingDeal(String, String, String): boolean
+}
+
+class TradingDeal {
+    -String id
+    -String owner
+    -String cardToTrade
+    -String requiredType
+    -String requiredElement
+    -Double minimumDamage
+    +getId(): String
+    +getOwner(): String
+    +getCardToTrade(): String
+    +getRequiredType(): String
+    +getRequiredElement(): String
+    +getMinimumDamage(): Double
+    +setId(String): void
+    +setOwner(String): void
+    +setCardToTrade(String): void
+    +setRequiredType(String): void
+    +setRequiredElement(String): void
+    +setMinimumDamage(Double): void
 }
 
 abstract class Card {
@@ -73,13 +134,51 @@ class SpellCard {
     +getType(): String
 }
 
+class Battle {
+    -Player player1
+    -Player player2
+    -StringBuilder battleLog
+    +start(): void
+    +calculateDamage(Card, Card, Player): double
+    +applySpecialRules(Card, Card): boolean
+    +getEffectivenessMultiplier(String, String): double
+    -updateElo(String, String, boolean): void
+    -getElementType(Card): String
+}
+
+class BattleHandler {
+    +enqueuePlayer(Player)
+}
+
+class Player {
+    -String username
+    -List<Card> deck
+    -BufferedWriter writer
+    -Object battleLock
+    -String boosterCardId
+    -boolean boosterUsed
+    +drawRandomCard(): Card
+    +addCard(Card): void
+    +removeCard(Card): void
+    +sendBattleResult(String): void
+    +isBoosterCard(Card): boolean
+    +markBoosterUsed(): void
+    +hasCards(): boolean
+    +getUsername(): String
+    +getBattleLock(): Object
+}
+
 Main --> ClientHandler
 ClientHandler --> UserDatabase
 ClientHandler --> PackageDatabase
 ClientHandler --> Database
+ClientHandler --> BattleHandler
+BattleHandler --> Battle
+Battle --> Player
 UserDatabase --> User
 UserDatabase --> Card
 PackageDatabase --> Card
 Card <|-- MonsterCard
 Card <|-- SpellCard
+TradingDatabase --> TradingDeal
 @enduml
